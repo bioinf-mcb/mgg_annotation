@@ -1,6 +1,6 @@
 # ANNOTATION config
-PHAGES_DIR: /home/MCB/jkoszucki/storage/jkoszucki/
-OUTPUT_DIR: /home/MCB/jkoszucki/storage/jkoszucki/ANNOTATION_TEST_DIR
+PROTEINS_FILE: test/proteins.fasta
+OUTPUT_DIR: test/ANNOTATION_OUTPUT
 
 CLUSTERING:
   IDENTITY: 0.5
