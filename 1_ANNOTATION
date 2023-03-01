@@ -1,0 +1,179 @@
+""" Functional annotation by using profile-profile comparisons. 
+Authors: Janusz Koszucki, Rafal Mostowy, Bogna Smug
+Version: 0.1v
+"""
+
+from pathlib import Path
+from datetime import datetime
+from multiprocessing import cpu_count
+
+
+
+# paths & params
+PROPHAGE_DIR = config['DATABASE_DIRS']
+OUTPUT_DIR = config['OUTPUT_DIR']
+
+CLU_IDENTITY = config['CLUSTERING']['IDENTITY']
+CLU_COVERAGE = config['CLUSTERING']['COVERAGE']
+CLU_EVAL = config['CLUSTERING']['EVAL']
+CLU_SENSITIVITY = config['CLUSTERING']['SENSITIVITY']
+
+
+# intermediate folders
+VERSION_DIR = f'ANNOTATION_IDENT{str(int(CLU_IDENTITY * 100))}_COV{str(int(CLU_COVERAGE * 100))}'
+WORKING_DIR = Path(OUTPUT_DIR, VERSION_DIR)
+
+# level 1
+CLUSTERING_DIR = Path(WORKING_DIR, f'1_CLUSTERING')
+SEARCH_DIR = Path(WORKING_DIR, f'2_SEARCH')
+ANNOTATION_DIR = Path(WORKING_DIR, f'3_ANNOTATION')
+
+# level 2
+MSA_DIR = Path(ANNOTATION_DIR, '1_MSA')
+
+
+print(f"{bcolors.OKGREEN}--------------------    ANNOTATION   ---------------------{bcolors.ENDC}")
+print(f"{bcolors.OKGREEN}----------------------     START   -----------------------\n{bcolors.ENDC}")
+
+
+rule target:
+    input:
+        Path(CLUSTERING_DIR, 'PCs.tsv'),
+        expand(Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr'), PC=PCs),
+        expand(Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr'), PC=PCs),
+        expand(Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr'), PC=PCs),
+        expand(Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr'), PC=PCs),
+        Path(ANNOTATION_DIR, 'results.tsv'),
+        Path(ANNOTATION_DIR, 'annotation.tsv')
+
+
+
+                        ############################
+                        ######## CLUSTERING ########
+                        ############################
+
+# cluster proteins
+rule clustering:
+    input: Path(PROTEINS_FASTA)
+    output:
+        mmseqs_dir=directory(Path(CLUSTERING_DIR)),
+        clusters=Path(CLUSTERING_DIR, 'raw_PCs.tsv'),
+        msa=Path(CLUSTERING_DIR, 'msa.a3m'),
+        protein_db=Path(CLUSTERING_DIR, 'tmp', 'PROTEIN-DB'),
+        cluster_db=Path(CLUSTERING_DIR, 'tmp', 'CLUSTER-DB'),
+        clust2msa=Path(CLUSTERING_DIR, 'tmp', 'CLU-MSA-DB')
+    params:
+        IDENTITY=CLU_IDENTITY,
+        COVERAGE=CLU_COVERAGE,
+        EVAL=CLU_EVAL,
+        SENSITIVITY=CLU_SENSITIVITY
+    conda: 'envs/mmseqs.yml'
+    shell:
+        "mmseqs createdb {input} {output.protein_db}; "
+        "mmseqs cluster {output.protein_db} {output.cluster_db} {output.mmseqs_dir} --min-seq-id {params.IDENTITY} -s {params.SENSITIVITY} -c {params.COVERAGE} -e {params.EVAL}; "
+        "mmseqs createtsv {output.protein_db} {output.protein_db} {output.cluster_db} {output.clusters}; "
+        "mmseqs result2msa {output.protein_db} {output.protein_db} {output.cluster_db} {output.clust2msa} --msa-format-mode 3; "
+        "cp {output.clust2msa} {output.msa}; " # copy results
+        "touch {output.protein_db} {output.cluster_db} {output.clust2msa}; " # create snakemake dummy files exist
+
+
+
+# convert clusters
+rule process_clustering:
+    input: Path(CLUSTERING_DIR, 'raw_PCs.tsv')
+    output: Path(CLUSTERING_DIR, 'PCs.tsv'),
+    conda: 'envs/base.yml'
+    script: 'clusters.py'
+
+
+
+                        ###########################
+                        ######## ANNOTATION #######
+                        ###########################
+
+# clean msa
+rule clean_msa:
+    input: Path(CLUSTERING_DIR, 'msa.a3m')
+    output: Path(MSA_DIR, 'msa.a3m')
+    conda: 'envs/base.yml'
+    script: 'scripts/clean_msa.py'
+
+
+# msa into seperate files
+rule split_msa:
+    input: Path(MSA_DIR, 'msa.a3m')
+    output:
+        msa4view=Path(MSA_DIR, '1_MSA_VIEW', '{PC}.a3m'),
+        msa4search=Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
+    params: pcs_table
+    conda: 'envs/base.yml'
+    script: 'scripts/split_msa.py'
+
+
+# enrich msa with PHROGS
+rule enrich_msa:
+    input: Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
+    output: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m')
+    params: PHROGS=PHROGS
+    conda: 'envs/hhsuite.yml'
+    shell: 'hhblits -i {input} -d {params.PHROGS} -oa3m {output} -n 2 -cov 0.8 -p 0.95'
+
+
+
+                        #######################
+                        ######## SEARCH #######
+                        #######################
+
+# search PHROGs (one iteration)
+rule PHROGs:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr')
+    params: PHROGS=PHROGS
+    conda: 'envs/hhsuite.yml'
+    shell: 'hhblits -i {input} -d {params.PHROGS} -o {output} -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+
+# search ALANDB (one iteration)
+rule ALANDB:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr')
+    params: ALANDB=ALANDB
+    conda: 'envs/hhsuite.yml'
+    shell: 'hhblits -i {input} -d {params.ALANDB} -o {output} -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+# search PFAM (two interations)
+rule PFAM:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr')
+    params: PFAM=PFAM
+    conda: 'envs/hhsuite.yml'
+    shell: 'hhblits -i {input} -d {params.PFAM} -o {output} -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+
+# search ECOD (two interations)
+rule ECOD:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr')
+    params: ECOD=ECOD
+    conda: 'envs/hhsuite.yml'
+    shell: 'hhblits -i {input} -d {params.ECOD} -o {output} -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+
+# annotation table
+rule annotation:
+    input:
+        phrogs=expand(Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr'), PC=PCs),
+        alan=expand(Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr'), PC=PCs),
+        pfam=expand(Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr'), PC=PCs),
+        ecod=expand(Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr'), PC=PCs),
+        main=Path(OUTPUT_DIR, 'main.tsv')
+    output:
+        results=Path(ANNOTATION_DIR, 'results.tsv'),
+        annotation=Path(ANNOTATION_DIR, 'annotation.tsv'),
+        main=Path(ANNOTATION_DIR, 'main_annotated.tsv')
+    params:
+        PHROGS_ANNOT=PHROGS_ANNOT,
+        MGG_PHROGS_ANNOT=MGG_PHROGS_ANNOT,
+        ALAN_ANNOT=ALAN_ANNOT
+    conda: 'envs/hhsuite.yml'
+    script: 'scripts/annotation.py'

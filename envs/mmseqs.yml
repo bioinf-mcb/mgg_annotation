@@ -1,0 +1,7 @@
+name: mmseqs2
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - mmseqs2=13.45111
+  - clustalo=1.2.4

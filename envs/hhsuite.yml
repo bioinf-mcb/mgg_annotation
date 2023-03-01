@@ -1,0 +1,11 @@
+name: hhsuite
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - hhsuite 
+  - pandas
+  - numpy
+  - pip
+  - pip:
+    - csb

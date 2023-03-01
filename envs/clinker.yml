@@ -1,0 +1,6 @@
+name: clinker
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - clinker-py

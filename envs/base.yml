@@ -1,0 +1,11 @@
+name: base
+channels:
+  - defaults
+  - bioconda
+  - conda-forge
+dependencies:
+  - python
+  - biopython
+  - seaborn
+  - pandas
+  - matplotlib
