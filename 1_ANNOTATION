@@ -218,7 +218,7 @@ rule annotation:
     output:
         results=Path(ANNOTATION_DIR, 'results.tsv'),
         annotation=Path(ANNOTATION_DIR, 'annotation.tsv'),
-        orfs=Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv')
+        orfs=Path(WORKING_DIR, 'confident_orfs_annotated.tsv')
     params:
         PHROGS_ANNOT=PHROGS_ANNOT,
         MGG_PHROGS_ANNOT=MGG_PHROGS_ANNOT,
