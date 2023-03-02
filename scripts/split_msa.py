@@ -5,12 +5,14 @@ from Bio import SeqIO
 import pandas as pd
 
 # paths
-msa_all = snakemake.input[0]
+msa_all = snakemake.input.msa
+pc_table = snakemake.input.pcs
+
 msa_view = snakemake.output.msa4view
 msa_search = snakemake.output.msa4search
 
 pc = Path(msa_view).stem
-pc_table = snakemake.params[0]
+
 
 # load
 pcs_df = pd.read_csv(pc_table, sep='\t')

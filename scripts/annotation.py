@@ -58,7 +58,8 @@ def get_hits(tables, dbname='UNKNOWN'):
 
 # paths & params
 print('Loading paths... ', end='')
-main_input = snakemake.input.main
+pcs_table = snakemake.input.PCS_TABLE
+main_input = snakemake.input.ORFS_TABLE
 phrogs_tables = list(snakemake.input.phrogs)
 alan_tables = list(snakemake.input.alan)
 pfam_tables = list(snakemake.input.pfam)
@@ -70,7 +71,7 @@ ALAN_ANNOT = snakemake.params.ALAN_ANNOT
 
 results = snakemake.output.results
 annot = snakemake.output.annotation
-main_with_functions = snakemake.output.main
+main_with_functions = snakemake.output.orfs
 print('Done!')
 
 # load & merge
@@ -174,7 +175,12 @@ best_hits_df.to_csv(annot, sep='\t', index=False)
 #### ADD FUNCTIONS TO MAIN (PROTEINS) TABLE
 
 # read
-main_df = pd.read_csv(main_input, sep='\t')
+main_df = pd.read_csv(main_input)
+pcs_df = pd.read_csv(pcs_table, sep='\t')
+
+
+# add protein clusters
+main_df = main_df.merge(pcs_df, on='proteinID', how='left')
 
 # reformat
 best_hits_df['db_function'] = best_hits_df.apply(lambda row: row['report_label'] + '_' + 'function' ,axis=1)
@@ -194,5 +200,5 @@ report_df = function_df.merge(params_df, on='PC', how='left')
 # map function
 main_df = main_df.merge(report_df, on='PC', how ='left')
 main_df = main_df.fillna('-')
-main_df.to_csv(main_with_functions,sep='\t', index=False)
+main_df.to_csv(main_with_functions, sep='\t', index=False)
 

@@ -1,22 +1,41 @@
 """ Functional annotation by using profile-profile comparisons. 
 Authors: Janusz Koszucki, Rafal Mostowy, Bogna Smug
-Version: 0.1v
+Version: 0.2v
 """
 
+# modules
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from multiprocessing import cpu_count
-
+from scripts.utils import bcolors
 
 
 # paths & params
-PROPHAGE_DIR = config['DATABASE_DIRS']
+ORF_PREDICTION_DIR = config['ORF_PREDICTION_DIR']
 OUTPUT_DIR = config['OUTPUT_DIR']
 
+
+# input
+PHAGE_PROTEINS_FILES = list(Path(ORF_PREDICTION_DIR, '4_proteins').glob('*fasta'))
+ORFS_TABLE = Path(ORF_PREDICTION_DIR, 'confident_orfs.csv')
+
+# clustering params
 CLU_IDENTITY = config['CLUSTERING']['IDENTITY']
 CLU_COVERAGE = config['CLUSTERING']['COVERAGE']
 CLU_EVAL = config['CLUSTERING']['EVAL']
 CLU_SENSITIVITY = config['CLUSTERING']['SENSITIVITY']
+
+# database paths
+PHROGS = Path(config['HHSUITE']['PHROGS'])
+PFAM = Path(config['HHSUITE']['PFAM'])
+ECOD = Path(config['HHSUITE']['ECOD'])
+ALANDB = Path(config['HHSUITE']['ALANDB'])
+
+# database metadata paths
+PHROGS_ANNOT = config['METADATA']['PHROGS_ANNOT']
+MGG_PHROGS_ANNOT = config['METADATA']['MGG_PHROGS_ANNOT']
+ALAN_ANNOT = config['METADATA']['ALAN_ANNOT']
 
 
 # intermediate folders
@@ -32,29 +51,49 @@ ANNOTATION_DIR = Path(WORKING_DIR, f'3_ANNOTATION')
 MSA_DIR = Path(ANNOTATION_DIR, '1_MSA')
 
 
+### protein clusters
+PCS_TABLE = Path(WORKING_DIR, 'PCs.tsv')
+
+
+# prompt
 print(f"{bcolors.OKGREEN}--------------------    ANNOTATION   ---------------------{bcolors.ENDC}")
 print(f"{bcolors.OKGREEN}----------------------     START   -----------------------\n{bcolors.ENDC}")
 
 
-rule target:
-    input:
-        Path(CLUSTERING_DIR, 'PCs.tsv'),
-        expand(Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr'), PC=PCs),
-        expand(Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr'), PC=PCs),
-        expand(Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr'), PC=PCs),
-        expand(Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr'), PC=PCs),
-        Path(ANNOTATION_DIR, 'results.tsv'),
-        Path(ANNOTATION_DIR, 'annotation.tsv')
+print(f"{bcolors.WARNING}For a seamless run, we've separated clustering and functional annotation due to wildcard issues in Snakemake.\nPlease run clustering first, then do functional annotation.{bcolors.ENDC}")
+print(f"{bcolors.OKGREEN}Choose:\n[1] clustering\n[2] functional annotation\n[3] parse annotation table only{bcolors.ENDC}")
 
+mode = input()
+
+if mode == '1': 
+    files2generate = [Path(WORKING_DIR, 'PCs.tsv')]
+elif mode == '2':
+    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
+    files2generate = [Path(SEARCH_DIR, '1_PHROGs', f'{PC}.hhr') for PC in PCs]
+    files2generate.append(Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv'))
+elif mode == '3':
+    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
+    files2generate = [Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv')]
+else: print(f'{bcolors.FAIL}Wrong mode!{bcolors.ENDC}')
+
+rule target:
+    input: files2generate
 
 
                         ############################
                         ######## CLUSTERING ########
                         ############################
 
+# proteins file
+rule get_proteins:
+    input: PHAGE_PROTEINS_FILES
+    output: Path(WORKING_DIR, 'proteins.fasta')
+    shell: 'cat {input} >> {output}' 
+
+
 # cluster proteins
 rule clustering:
-    input: Path(PROTEINS_FASTA)
+    input: Path(WORKING_DIR, 'proteins.fasta')
     output:
         mmseqs_dir=directory(Path(CLUSTERING_DIR)),
         clusters=Path(CLUSTERING_DIR, 'raw_PCs.tsv'),
@@ -81,14 +120,15 @@ rule clustering:
 # convert clusters
 rule process_clustering:
     input: Path(CLUSTERING_DIR, 'raw_PCs.tsv')
-    output: Path(CLUSTERING_DIR, 'PCs.tsv'),
+    output: Path(WORKING_DIR, 'PCs.tsv'),
     conda: 'envs/base.yml'
-    script: 'clusters.py'
+    threads: 1
+    script: 'scripts/clusters.py'
 
 
 
                         ###########################
-                        ######## ANNOTATION #######
+                        ######## PROCESSING #######
                         ###########################
 
 # clean msa
@@ -101,18 +141,20 @@ rule clean_msa:
 
 # msa into seperate files
 rule split_msa:
-    input: Path(MSA_DIR, 'msa.a3m')
+    input: 
+        msa=Path(MSA_DIR, 'msa.a3m'),
+        pcs=Path(WORKING_DIR, 'PCs.tsv')
     output:
         msa4view=Path(MSA_DIR, '1_MSA_VIEW', '{PC}.a3m'),
         msa4search=Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
-    params: pcs_table
     conda: 'envs/base.yml'
     script: 'scripts/split_msa.py'
 
 
+
 # enrich msa with PHROGS
 rule enrich_msa:
-    input: Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
+    input: lambda pcs: Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
     output: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m')
     params: PHROGS=PHROGS
     conda: 'envs/hhsuite.yml'
@@ -159,6 +201,11 @@ rule ECOD:
     shell: 'hhblits -i {input} -d {params.ECOD} -o {output} -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
 
 
+                        ##########################
+                        ####### ANNOTATION #######
+                        ##########################
+
+
 # annotation table
 rule annotation:
     input:
@@ -166,14 +213,16 @@ rule annotation:
         alan=expand(Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr'), PC=PCs),
         pfam=expand(Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr'), PC=PCs),
         ecod=expand(Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr'), PC=PCs),
-        main=Path(OUTPUT_DIR, 'main.tsv')
+        PCS_TABLE=PCS_TABLE,
+        ORFS_TABLE=ORFS_TABLE
     output:
         results=Path(ANNOTATION_DIR, 'results.tsv'),
         annotation=Path(ANNOTATION_DIR, 'annotation.tsv'),
-        main=Path(ANNOTATION_DIR, 'main_annotated.tsv')
+        orfs=Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv')
     params:
         PHROGS_ANNOT=PHROGS_ANNOT,
         MGG_PHROGS_ANNOT=MGG_PHROGS_ANNOT,
         ALAN_ANNOT=ALAN_ANNOT
     conda: 'envs/hhsuite.yml'
     script: 'scripts/annotation.py'
+
