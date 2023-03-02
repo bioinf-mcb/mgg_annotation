@@ -60,8 +60,8 @@ print(f"{bcolors.OKGREEN}--------------------    ANNOTATION   ------------------
 print(f"{bcolors.OKGREEN}----------------------     START   -----------------------\n{bcolors.ENDC}")
 
 
-print(f"{bcolors.WARNING}For a seamless run, we've separated clustering and functional annotation due to wildcard issues in Snakemake.\nPlease run clustering first, then do functional annotation.{bcolors.ENDC}")
-print(f"{bcolors.OKGREEN}Choose:\n[1] clustering\n[2] functional annotation\n[3] parse annotation table only{bcolors.ENDC}")
+print(f"{bcolors.WARNING}For a seamless run, we've separated clustering, functional annotation and parsing results due to wildcard issues in Snakemake.\nPlease run clustering first, then do functional annotation.{bcolors.ENDC}")
+print(f"{bcolors.OKGREEN}Choose:\n[1] clustering\n[2] functional annotation (profile-profile)\n[3] parse annotation table{bcolors.ENDC}")
 
 mode = input()
 
@@ -71,7 +71,6 @@ if mode == '1':
 elif mode == '2':
     PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
     files2generate = [Path(SEARCH_DIR, '1_PHROGs', f'{PC}.hhr') for PC in PCs]
-    files2generate.append(Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv'))
 elif mode == '3':
     PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
     files2generate = [Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv')]
