@@ -1,6 +1,6 @@
 """ Functional annotation by using profile-profile comparisons. 
 Authors: Janusz Koszucki, Rafal Mostowy, Bogna Smug
-Version: 0.2v
+Version: 0.2
 """
 
 # modules
@@ -67,6 +67,7 @@ mode = input()
 
 if mode == '1': 
     files2generate = [Path(WORKING_DIR, 'PCs.tsv')]
+    PCs = []
 elif mode == '2':
     PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
     files2generate = [Path(SEARCH_DIR, '1_PHROGs', f'{PC}.hhr') for PC in PCs]
