@@ -73,7 +73,7 @@ elif mode == '2':
     files2generate = [Path(SEARCH_DIR, '1_PHROGs', f'{PC}.hhr') for PC in PCs]
 elif mode == '3':
     PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
-    files2generate = [Path(ANNOTATION_DIR, 'confident_orfs_annotated.tsv')]
+    files2generate = [Path(WORKING_DIR, 'confident_orfs_annotated.tsv')]
 else: print(f'{bcolors.FAIL}Wrong mode!{bcolors.ENDC}')
 
 rule target:
