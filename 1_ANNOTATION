@@ -11,6 +11,8 @@ from multiprocessing import cpu_count
 from scripts.utils import bcolors
 from time import sleep
 
+configfile: 'config.yml'
+
 
 # paths & params
 ORF_PREDICTION_DIR = config['ORF_PREDICTION_DIR']
