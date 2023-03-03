@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime
 from multiprocessing import cpu_count
 from scripts.utils import bcolors
+from time import sleep
 
 
 # paths & params
@@ -61,20 +62,37 @@ print(f"{bcolors.OKGREEN}----------------------     START   --------------------
 
 
 print(f"{bcolors.WARNING}For a seamless run, we've separated clustering, functional annotation and parsing results due to wildcard issues in Snakemake.\nPlease run clustering first, then do functional annotation.{bcolors.ENDC}")
-print(f"{bcolors.OKGREEN}Choose:\n[1] clustering\n[2] functional annotation (profile-profile)\n[3] parse annotation table{bcolors.ENDC}")
+print(f"{bcolors.OKGREEN}\nChoose:\n[1] Cluster quickly with more cores\n[2] Annotate functionally (profile-profile) 'quickly' with more cores (RAM not critical)\n[3] Parse annotation table (1 core, high RAM usage){bcolors.ENDC}")
+print(f"{bcolors.FAIL}\nIMPORTANT! If you want to run [3] parsing tables only you have to add flag to snakemake command: --allowed-rules annotation{bcolors.ENDC}")
+print(f"{bcolors.FAIL}Otherwise you will rerun all profile-profile comparisons which are time consuming!{bcolors.ENDC}")
 
-mode = input()
+mode = int(input())
 
-if mode == '1': 
-    files2generate = [Path(WORKING_DIR, 'PCs.tsv')]
+if mode == 1:
     PCs = []
-elif mode == '2':
-    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
-    files2generate = [Path(SEARCH_DIR, '1_PHROGs', f'{PC}.hhr') for PC in PCs]
-elif mode == '3':
-    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
+    files2generate = [Path(WORKING_DIR, 'PCs.tsv')]
+    print(f"{bcolors.OKGREEN}\nLet's run clustering!{bcolors.ENDC}")
+
+elif mode == 2:
+    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].iloc[:20].to_list()
+    
+    files2generate = []
+    for PC in PCs:
+        files2generate.append(Path(SEARCH_DIR, '1_PHROGs', f'{PC}.hhr') )
+        files2generate.append(Path(SEARCH_DIR, '2_ALANDB', f'{PC}.hhr'))
+        files2generate.append(Path(SEARCH_DIR, '3_PFAM', f'{PC}.hhr'))
+        files2generate.append(Path(SEARCH_DIR, '4_ECOD', f'{PC}.hhr'))
+
+    print(f"{bcolors.OKGREEN}\nLet's run profile-profile comparisons!{bcolors.ENDC}")
+elif mode == 3:
+    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].iloc[:20].to_list()
     files2generate = [Path(WORKING_DIR, 'confident_orfs_annotated.tsv')]
+    print(f"{bcolors.OKGREEN}\n[3] Let's parse final table!{bcolors.ENDC}")
+    print(f"{bcolors.FAIL}*** Did you remember about snakemake flag!? ***{bcolors.ENDC}")
+    sleep(4)
+
 else: print(f'{bcolors.FAIL}Wrong mode!{bcolors.ENDC}')
+
 
 rule target:
     input: files2generate
