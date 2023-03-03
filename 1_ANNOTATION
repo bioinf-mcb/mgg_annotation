@@ -74,9 +74,9 @@ if mode == 1:
     PCs = []
     files2generate = [Path(WORKING_DIR, 'PCs.tsv')]
     print(f"{bcolors.OKGREEN}\nLet's run clustering!{bcolors.ENDC}")
-
+    sleep(1)
 elif mode == 2:
-    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].iloc[:20].to_list()
+    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
     
     files2generate = []
     for PC in PCs:
@@ -86,8 +86,9 @@ elif mode == 2:
         files2generate.append(Path(SEARCH_DIR, '4_ECOD', f'{PC}.hhr'))
 
     print(f"{bcolors.OKGREEN}\nLet's run profile-profile comparisons!{bcolors.ENDC}")
+    sleep(1)
 elif mode == 3:
-    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].iloc[:20].to_list()
+    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
     files2generate = [Path(WORKING_DIR, 'confident_orfs_annotated.tsv')]
     print(f"{bcolors.OKGREEN}\n[3] Let's parse final table!{bcolors.ENDC}")
     print(f"{bcolors.FAIL}*** Did you remember about snakemake flag!? ***{bcolors.ENDC}")

@@ -1,2 +1,4 @@
 test
 .snakemake
+klebINPH.yml
+scripts/__pycache__
