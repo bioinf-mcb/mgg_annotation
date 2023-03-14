@@ -10,9 +10,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-from utils import bcolors
+#from utils import bcolors
 from annotation_utils import get_phrog, curate_columns, get_no_hit_frames
-from annotation_utils import report_phrogs, report_alan, report_pfam, report_ecod
+from annotation_utils import report_phrogs
 from annotation_utils import combine_function_and_confidence
 
 # functions
@@ -61,9 +61,9 @@ print('Loading paths... ', end='')
 pcs_table = snakemake.input.PCS_TABLE
 main_input = snakemake.input.ORFS_TABLE
 phrogs_tables = list(snakemake.input.phrogs)
-alan_tables = list(snakemake.input.alan)
-pfam_tables = list(snakemake.input.pfam)
-ecod_tables = list(snakemake.input.ecod)
+#alan_tables = list(snakemake.input.alan)
+#pfam_tables = list(snakemake.input.pfam)
+#ecod_tables = list(snakemake.input.ecod)
 
 PHROGS_ANNOT = snakemake.params.PHROGS_ANNOT
 MGG_PHROGS_ANNOT = snakemake.params.MGG_PHROGS_ANNOT
@@ -77,9 +77,9 @@ print('Done!')
 # load & merge
 print('Loading hhr tables... ', end='')
 phrogs_df = get_hits(phrogs_tables, dbname='PHROGS')
-alan_df = get_hits(alan_tables, dbname='ALANDB')
-pfam_df = get_hits(pfam_tables, dbname='PFAM')
-ecod_df = get_hits(ecod_tables, dbname='ECOD')
+#alan_df = get_hits(alan_tables, dbname='ALANDB')
+#pfam_df = get_hits(pfam_tables, dbname='PFAM')
+#ecod_df = get_hits(ecod_tables, dbname='ECOD')
 
 ### MAP MGG PHROGS functions and ALAN function ###
 
@@ -114,18 +114,24 @@ phrogs_df['phrog'] = phrogs_df.apply(get_phrog, axis=1)
 phrogs_df = phrogs_df.merge(phrogs_annot_df, on='phrog', how='left')
 
 # add ALAN metadata
-alan_df['alan_profile'] = alan_df['target']
-alan_df = alan_df.merge(alan_annot_df, on='alan_profile', how='left')
+# alan_df['alan_profile'] = alan_df['target']
+# alan_df = alan_df.merge(alan_annot_df, on='alan_profile', how='left')
 
 # master table
 print('combine tables... ', end='')
-df = pd.concat([phrogs_df, alan_df, pfam_df, ecod_df], axis=0)
+#df = pd.concat([phrogs_df, alan_df, pfam_df, ecod_df], axis=0)
+df = phrogs_df
 
 # format columns
-df[['phrog', 'alan_profile']] = df[['phrog', 'alan_profile']].fillna('0')
+# df[['phrog', 'alan_profile']] = df[['phrog', 'alan_profile']].fillna('0')
+# df['phrog'] = df['phrog'].astype(int)
+# df['phrog/alan_profile'] = df.apply(curate_columns, axis=1)
+# df = df.drop(['phrog', 'alan_profile'], axis=1)
+
+df['phrog'] = df[['phrog']].fillna('0')
 df['phrog'] = df['phrog'].astype(int)
-df['phrog/alan_profile'] = df.apply(curate_columns, axis=1)
-df = df.drop(['phrog', 'alan_profile'], axis=1)
+df['phrog'] = df.apply(curate_columns, axis=1)
+df = df.drop(['phrog'], axis=1)
 
 # sort table per PC
 df['tmp'] = df['query'].str.strip('PC').astype(int)
@@ -142,22 +148,22 @@ best_hits_dfs = []
 for pcid, pc in df.groupby('query'):
     
     # default (no hit)
-    phrogs_df, alan_df, pfam_df, ecod_df = get_no_hit_frames(pcid)
+    phrogs_df = get_no_hit_frames(pcid)
     
     for dbid, db in pc.groupby('db'):
         
         # report function
         if dbid == 'PHROGS': phrogs_df = report_phrogs(db, max_evalue=10**-3, nfunc2report=2, verbose=False)
-        elif dbid == 'ALANDB': alan_df = report_alan(db, min_prob=0.95, nfunc2report=2, verbose=False)
-        elif dbid == 'PFAM': pfam_df = report_pfam(db, verbose=False)
-        elif dbid == 'ECOD': ecod_df = report_ecod(db, verbose=False)
+        #elif dbid == 'ALANDB': alan_df = report_alan(db, min_prob=0.95, nfunc2report=2, verbose=False)
+        #elif dbid == 'PFAM': pfam_df = report_pfam(db, verbose=False)
+        #elif dbid == 'ECOD': ecod_df = report_ecod(db, verbose=False)
         else: pass
 
     # save function
     best_hits_dfs.append(phrogs_df)
-    best_hits_dfs.append(alan_df)
-    best_hits_dfs.append(pfam_df)
-    best_hits_dfs.append(ecod_df)
+    #best_hits_dfs.append(alan_df)
+    #best_hits_dfs.append(pfam_df)
+    #best_hits_dfs.append(ecod_df)
 
 
 # combine results for each db

@@ -12,7 +12,7 @@ def get_phrog(row):
 def curate_columns(row):
     
     phrog = str(row['phrog'])
-    alan_profile = str(row['alan_profile'])
+    # alan_profile = str(row['alan_profile'])
     
     if phrog != '0': return phrog
     elif alan_profile != '0': return alan_profile
