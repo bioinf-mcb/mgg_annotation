@@ -68,7 +68,9 @@ print(f"{bcolors.OKGREEN}\nChoose:\n[1] Cluster quickly with more cores\n[2] Ann
 print(f"{bcolors.FAIL}\nIMPORTANT! If you want to run [3] parsing tables only you have to add flag to snakemake command: --allowed-rules annotation{bcolors.ENDC}")
 print(f"{bcolors.FAIL}Otherwise you will rerun all profile-profile comparisons which are time consuming!{bcolors.ENDC}")
 
-mode = int(input())
+# mode = int(input())
+print('Hardcoded for Janusz puprose!!!')
+mode = 2
 
 if mode == 1:
     PCs = []
@@ -76,7 +78,7 @@ if mode == 1:
     print(f"{bcolors.OKGREEN}\nLet's run clustering!{bcolors.ENDC}")
     sleep(1)
 elif mode == 2:
-    PCs=pd.read_csv(PCS_TABLE, sep='\t')['PC'].to_list()
+    PCs=list(pd.read_csv(PCS_TABLE, sep='\t')['PC'].unique())
     
     files2generate = []
     for PC in PCs:
