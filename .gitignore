@@ -2,3 +2,4 @@ test
 .snakemake
 klebINPH.yml
 scripts/__pycache__
+nohup.out
