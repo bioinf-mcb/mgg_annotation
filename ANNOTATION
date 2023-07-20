@@ -301,13 +301,13 @@ rule enrich_msa:
     shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0.8 -p 0.95'
 
 
-# search PHROGs (one iteration)
-rule PHROGs:
-    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
-    output: Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr')
-    params: PHROGS=PHROGS
-    conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+## search PHROGs (one iteration)
+#rule PHROGs:
+#    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+#    output: Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr')
+#    params: PHROGS=PHROGS
+#    conda: 'dependencies/envs/hhsuite.yml'
+#    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
 
 
 
