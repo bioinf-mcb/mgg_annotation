@@ -1,6 +1,6 @@
-name: clinker
+name: hhsuite
 channels:
   - conda-forge
   - bioconda
 dependencies:
-  - clinker-py
+  - hhsuite=3.3.0

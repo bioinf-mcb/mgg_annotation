@@ -1,5 +1,4 @@
-test
+test/output
 .snakemake
-klebINPH.yml
 scripts/__pycache__
 nohup.out

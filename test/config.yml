@@ -1,0 +1,25 @@
+# configuration file
+PHAGES_DIR: test/data
+OUTPUT_DIR: test/output
+INPUT_EXTENSION: fasta
+PHAGE_MIN_LENGTH: 2000 # bp
+
+# proteins families
+CLUSTERING:
+  IDENTITY: 0.5
+  COVERAGE: 0.8
+  EVAL: 0.001
+  SENSITIVITY: 8.5
+
+# paths to HHsuite databases
+HHSUITE:
+  PHROGS: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/phrogs_hhsuite_db/phrogs'
+  PFAM: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/pfamA_32'
+  ECOD: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/ECOD_F70'
+  ALANDB: ''
+
+# paths to metadata tables
+METADATA:
+  PHROGS_ANNOT: 'dependencies/tables/phrog_annot_v4.tsv'
+  MGG_PHROGS_ANNOT: 'dependencies/tables/v3_phrogs-table-rafal-3_12.csv'
+  ALAN_ANNOT: 'dependencies/tables/alan_annot.tsv'

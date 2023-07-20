@@ -1,0 +1,313 @@
+"""
+Phage oriented ORF prediction tool
+by Janusz Koszucki, Wanangwa Ndovie, Rafal Mostowy
+
+Phage-oriented pipeline for high-confidence Open Reading Frames prediction (genes)
+Algorithm copied from Multiphage-2 tool.
+
+version: 0.2
+date: 20.07.2023
+authors: Janusz Koszucki, Wanangwa Ndovie, Rafal Mostowy
+"""
+
+# load modules
+from dependencies.scripts.utils import bcolors, checkpoint
+from pathlib import Path
+import pandas as pd
+from Bio import SeqIO
+
+
+# start
+print(f"{bcolors.OKGREEN}Running Another Annotation Phage Tool! {bcolors.ENDC}", end='\n')
+
+
+# paths & params
+PHAGES_DIR = config['PHAGES_DIR']
+OUTPUT_DIR = config['OUTPUT_DIR']
+EXTENSION = config['INPUT_EXTENSION']
+PHAGE_MIN_LENGTH = config['PHAGE_MIN_LENGTH']
+
+IDENTITY = config['CLUSTERING']['IDENTITY']
+COVERAGE = config['CLUSTERING']['COVERAGE']
+EVAL = config['CLUSTERING']['EVAL']
+SENSITIVITY = config['CLUSTERING']['SENSITIVITY']
+
+# output
+IN_DIR_PROCESSED = Path(OUTPUT_DIR, '1_PROCESSED_INPUT')
+ORF_PREDICTION_DIR = Path(OUTPUT_DIR, '2_ORF_PREDICTION')
+ANNOTATION_DIR = Path(OUTPUT_DIR, '3_ANNOTATION')
+
+
+### intermediate folders
+
+# ORF prediction
+PHANOTATE_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '1_PHANOTATE')
+PRODIGAL_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '2_PRODIGAL')
+GLIMMER_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '3_GLIMMER')
+
+ORF_PROCESSING_DIR = Path(ORF_PREDICTION_DIR, '2_PROCESSING')
+ORFS_DIR = Path(ORF_PREDICTION_DIR, '3_ORFS')
+PROTEINS_DIR = Path(ORF_PREDICTION_DIR, '4_PROTEINS')
+
+
+# annotation
+VERSION=f'IDENT{str(int(IDENTITY * 100))}_COV{str(int(COVERAGE * 100))}'
+CLUSTERING_DIR = Path(ANNOTATION_DIR, f'1_CLUSTERING_{VERSION}')
+MSA_DIR = Path(ANNOTATION_DIR, '2_MSA')
+
+PHROGS = Path(config['HHSUITE']['PHROGS'])
+PFAM = Path(config['HHSUITE']['PFAM'])
+ECOD = Path(config['HHSUITE']['ECOD'])
+ALANDB = Path(config['HHSUITE']['ALANDB'])
+
+
+
+                        #############################################
+                        ######## PREPROCESSING & CHECKPOINTS ########
+                        #############################################
+
+
+
+# process input
+discarded_phages = checkpoint(PHAGES_DIR, IN_DIR_PROCESSED, PHAGE_MIN_LENGTH, EXTENSION)
+phages, = glob_wildcards(Path(IN_DIR_PROCESSED, '{phages}.' + EXTENSION))
+
+# checkpoint
+def trigger_PCs(wildcards):
+    
+    PCs_checkpoint = checkpoints.split_msa.get(**wildcards).output[0]
+
+    global PCs
+    PCs, = glob_wildcards(Path(PCs_checkpoint, '{PC}.a3m'))
+
+    return expand(Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'), PC=PCs)
+
+
+
+                    ################################
+                    ############ TARGET ############
+                    ################################
+
+rule target:
+    input:
+        Path(ORF_PREDICTION_DIR, 'metadata.tsv'),               # preprocessed
+        Path(PHANOTATE_DIR, 'phanotate.csv'),                   # run phanotate
+        Path(PRODIGAL_DIR, 'prodigal.csv'),                     # run prodigal
+        Path(GLIMMER_DIR, 'glimmer.csv'),                       # run glimmer
+        Path(ORF_PROCESSING_DIR, 'orfs.csv'),                   # processing results
+        Path(ORF_PREDICTION_DIR, 'confident_orfs.csv'),         # orfs/proteins
+        Path(ANNOTATION_DIR, 'proteins.fasta'),                 # concat proteins
+        Path(ANNOTATION_DIR, 'msa.a3m'),
+        Path(CLUSTERING_DIR, 'raw_PCs.tsv'),                    # expicitly ask for clustering
+        Path(ANNOTATION_DIR, 'PCs2proteins.tsv'),               # map PCs to proteins
+        trigger_PCs,                                            # per MSA/PC run
+        
+
+
+
+        #####################################
+        ######### CHECK INPUT FILES #########
+        #####################################
+
+# verify input
+rule check_input:
+    input: expand(Path(IN_DIR_PROCESSED, '{phage}.' + EXTENSION), phage=phages)
+    output:
+        fasta=Path(ORF_PREDICTION_DIR, 'phages.fasta'),
+        table=Path(ORF_PREDICTION_DIR, 'metadata.tsv')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script: 'dependencies/scripts/preprocessing.py'
+
+
+        ################################
+        ######## ORF PREDICTION ########
+        ################################
+
+
+### orf calling
+# run phanotate (runs in parallel)
+rule phanotate:
+    input: Path(IN_DIR_PROCESSED, '{phage}.' + EXTENSION)
+    output: Path(PHANOTATE_DIR, 'output', '{phage}.txt')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    shell: 'phanotate.py -o {output} {input}'
+
+
+# run prodigal (runs on single core)
+rule prodigal:
+    input: Path(ORF_PREDICTION_DIR, 'phages.fasta'),
+    output: Path(PRODIGAL_DIR, 'phages.prod')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    threads: workflow.cores * 1.0
+    shell: 'prodigal -i {input} -o {output} -f sco -p meta'
+
+# run glimmer (runs all cores)
+rule glimmer3:
+    input: Path(ORF_PREDICTION_DIR, 'phages.fasta')
+    output:
+        glimmer_predict=Path(GLIMMER_DIR, 'phages.predict'),
+        intermediate=Path(GLIMMER_DIR, 'phages.icm'),
+        longorfs=Path(GLIMMER_DIR, 'phages.longorfs'),
+        train=Path(GLIMMER_DIR, 'phages.train')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    threads: workflow.cores * 1.0
+    shell:
+        'long-orfs -n -t 1.15 {input} {output.longorfs}; '
+        'extract -t {input} {output.longorfs} > {output.train}; '
+        'build-icm -r {output.intermediate} < {output.train}; '
+        'glimmer3 -o50 -g110 -t30 {input} {output.intermediate} {output.glimmer_predict}; '
+        'mv {output.glimmer_predict}.predict {output.glimmer_predict}; '
+
+
+### concatenate results from orf calling
+# concat phannotate
+rule concat_phanotate:
+    input: expand(Path(PHANOTATE_DIR, 'output', '{phage}.txt'), phage=phages)
+    output: Path(PHANOTATE_DIR, 'phanotate.csv'),
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script: 'dependencies/scripts/concat_phanotate.py'
+
+# concat prodigal
+rule concat_prodigal:
+    input: Path(PRODIGAL_DIR, 'phages.prod')
+    output: Path(PRODIGAL_DIR, 'prodigal.csv')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script: 'dependencies/scripts/concat_prodigal.py'
+
+# concat glimmer
+rule concat_glimmer:
+    input: Path(GLIMMER_DIR, 'phages.predict')
+    output: Path(GLIMMER_DIR, 'unfiltered-glimmer.csv')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script: 'dependencies/scripts/concat_glimmer.py'
+
+# filter glimmer obvious false positives
+rule filter_glimmer:
+    input: Path(GLIMMER_DIR, 'unfiltered-glimmer.csv')
+    output:
+        Path(GLIMMER_DIR, 'glimmer.csv'),
+        Path(GLIMMER_DIR, 'removed.csv')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script:'dependencies/scripts/filter_glimmer.py'
+
+
+### process results
+# get high-confidence orfs
+rule processing:
+    input:
+        Path(ORF_PREDICTION_DIR, 'metadata.tsv'),
+        Path(PHANOTATE_DIR, 'phanotate.csv'),
+        Path(PRODIGAL_DIR, 'prodigal.csv'),
+        Path(GLIMMER_DIR, 'glimmer.csv')
+    output:
+        Path(ORF_PROCESSING_DIR, 'ambigous.csv'),
+        Path(ORF_PROCESSING_DIR, 'orfs.csv')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script: 'dependencies/scripts/processing.py'
+
+# extract ORFs & translate to proteins
+rule extract_translate_orfs:
+    input:
+        Path(IN_DIR_PROCESSED, '{phage}.' + EXTENSION),
+        Path(ORF_PROCESSING_DIR, 'orfs.csv')
+    output:
+        Path(ORF_PROCESSING_DIR, 'confident_orfs_tables', '{phage}.csv'),
+        Path(ORF_PROCESSING_DIR, 'erronous_orfs_tables', '{phage}.csv'),
+        Path(ORFS_DIR, '{phage}.fasta'),
+        Path(PROTEINS_DIR, '{phage}.fasta')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script:'dependencies/scripts/translation.py'
+
+# reorganize results in one table
+rule reorganize_table:
+    input: expand(Path(ORF_PROCESSING_DIR, 'confident_orfs_tables', '{phage}.csv'), phage=phages)
+    output: Path(ORF_PREDICTION_DIR, 'confident_orfs.csv')
+    conda: 'dependencies/envs/orf-prediction.yml'
+    script:'dependencies/scripts/reorganize_table.py'
+
+
+
+        #######################################
+        ######## FUNCTIONAL ANNOTATION ########
+        #######################################
+
+# concatenate proteins
+rule concat_proteins:
+    input: expand(Path(PROTEINS_DIR, '{phage}.fasta'), phage=phages)
+    output: Path(ANNOTATION_DIR, 'proteins.fasta')
+    script: 'dependencies/scripts/concat_proteins.py'
+
+
+# cluster proteins
+rule clustering:
+    input: Path(ANNOTATION_DIR, 'proteins.fasta')
+    output:
+        mmseqs_dir=directory(Path(CLUSTERING_DIR)),
+        clusters=Path(CLUSTERING_DIR, 'raw_PCs.tsv'),
+        msa=Path(CLUSTERING_DIR, 'raw_msa.a3m'),
+        protein_db=Path(CLUSTERING_DIR, 'tmp', 'PROTEIN-DB'),
+        cluster_db=Path(CLUSTERING_DIR, 'tmp', 'CLUSTER-DB'),
+        clust2msa=Path(CLUSTERING_DIR, 'tmp', 'CLU-MSA-DB')
+    params:
+        IDENTITY=IDENTITY,
+        COVERAGE=COVERAGE,
+        EVAL=EVAL,
+        SENSITIVITY=SENSITIVITY
+    conda: 'dependencies/envs/mmseqs.yml'
+    shell:
+        "mmseqs createdb {input} {output.protein_db}; "
+        "mmseqs cluster {output.protein_db} {output.cluster_db} {output.mmseqs_dir} --min-seq-id {params.IDENTITY} -s {params.SENSITIVITY} -c {params.COVERAGE} -e {params.EVAL}; "
+        "mmseqs createtsv {output.protein_db} {output.protein_db} {output.cluster_db} {output.clusters}; "
+        "mmseqs result2msa {output.protein_db} {output.protein_db} {output.cluster_db} {output.clust2msa} --msa-format-mode 3; "
+        "cp {output.clust2msa} {output.msa}; " # copy results
+        "touch {output.protein_db} {output.cluster_db} {output.clust2msa}; " # create snakemake dummy files exist
+
+
+# map clusters to proteins
+rule PCs2proteins:
+    input: Path(CLUSTERING_DIR, 'raw_PCs.tsv')
+    output: Path(ANNOTATION_DIR, 'PCs2proteins.tsv')
+    conda: 'dependencies/envs/base.yml'
+    script: 'dependencies/scripts/PCs2proteins.py'
+
+
+# clean msa
+rule clean_msa:
+    input: Path(CLUSTERING_DIR, 'raw_msa.a3m')
+    output: Path(ANNOTATION_DIR, 'msa.a3m')
+    conda: 'dependencies/envs/base.yml'
+    script: 'dependencies/scripts/clean_msa.py'
+
+
+# msa into seperate files
+### danger: using too much RAM 
+### solution: increase threads to run less rules in parallel
+checkpoint split_msa:
+    input: 
+        msa=Path(ANNOTATION_DIR, 'msa.a3m'),
+        PCs2proteins=Path(ANNOTATION_DIR, 'PCs2proteins.tsv')
+    output:
+        msa4view=directory(Path(MSA_DIR, '1_MSA_VIEW')),
+        msa4search=directory(Path(MSA_DIR, '2_MSA_SEARCH'))
+    script: 'dependencies/scripts/split_msa.py'
+
+
+# enrich msa with PHROGS
+rule enrich_msa:
+    input: Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
+    output: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m')
+    params: PHROGS=PHROGS
+    conda: 'dependencies/envs/hhsuite.yml'
+    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0.8 -p 0.95'
+
+
+# search PHROGs (one iteration)
+rule PHROGs:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr')
+    params: PHROGS=PHROGS
+    conda: 'dependencies/envs/hhsuite.yml'
+    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+
+
