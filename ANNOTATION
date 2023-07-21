@@ -21,18 +21,19 @@ from Bio import SeqIO
 print(f"{bcolors.OKGREEN}Running Another Annotation Phage Tool! {bcolors.ENDC}", end='\n')
 
 # warning
-print(f"{bcolors.WARNING}Problems to address:{bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}WARNINGS!{bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}1. No solid checkpoints on input. {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}2. Checkpoints and flags {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}2. Optional flags to implement. Rename files, folders and variables when ugly. {bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}3. Clean unused output {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}4. SetupTools for setting up HHsuite databases automatically {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}5. Remove redundant files (eg, 1_MSA_VIEW & 2_MSA_SEARCH) {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}6. Works only when running all databases {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}7. Removing conda environments in some rules (HHsuite) can significantly speed up calculations {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}4. Works only when running all databases {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}5. Removing conda environments in some rules (HHsuite) can significantly speed up calculations {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}6. Remove redundant files (eg, 1_MSA_VIEW & 2_MSA_SEARCH) {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}7. SetupTools for setting up HHsuite databases automatically {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}8. ALANDB HHsuite database on DropBox is (?) corrupted (multiple HMM profiles are empty, due to inconsistent number of columns in alignments from Alan) {bcolors.ENDC}", end='\n')
 
 
 # select databases
-DBs = ['PHROGS', 'PFAM', 'ECOD'] # 'ALANDB', 
+DBs = ['PHROGS', 'ALANDB', 'PFAM', 'ECOD']
 
 # paths & params
 PHAGES_DIR = config['PHAGES_DIR']
@@ -325,7 +326,7 @@ rule enrich_msa:
 # search PHROGs (one iteration)
 rule PHROGs:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
-    output: Path(HHSUITE_DIR, '1_PHROGS', '{PC}.hhr')
+    output: Path(HHSUITE_DIR, 'PHROGS', '{PC}.hhr')
     params: PHROGS=PHROGS
     conda: 'dependencies/envs/hhsuite.yml'
     shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
@@ -334,7 +335,7 @@ rule PHROGs:
 # search ALANDB (one iteration)
 rule ALANDB:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
-    output: Path(HHSUITE_DIR, '2_ALANDB', '{PC}.hhr')
+    output: Path(HHSUITE_DIR, 'ALANDB', '{PC}.hhr')
     params: ALANDB=ALANDB
     conda: 'dependencies/envs/hhsuite.yml'
     shell: 'hhblits -i "{input}" -d "{params.ALANDB}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
@@ -342,7 +343,7 @@ rule ALANDB:
 # search PFAM (two interations)
 rule PFAM:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
-    output: Path(HHSUITE_DIR, '3_PFAM', '{PC}.hhr')
+    output: Path(HHSUITE_DIR, 'PFAM', '{PC}.hhr')
     params: PFAM=PFAM
     conda: 'dependencies/envs/hhsuite.yml'
     shell: 'hhblits -i "{input}" -d "{params.PFAM}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
@@ -351,7 +352,7 @@ rule PFAM:
 # search ECOD (two interations)
 rule ECOD:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
-    output: Path(HHSUITE_DIR, '4_ECOD', '{PC}.hhr')
+    output: Path(HHSUITE_DIR, 'ECOD', '{PC}.hhr')
     params: ECOD=ECOD
     conda: 'dependencies/envs/hhsuite.yml'
     shell: 'hhblits -i "{input}" -d "{params.ECOD}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
@@ -361,10 +362,10 @@ rule ECOD:
 # # annotation table
 rule annotation:
     input:
-        phrogs_dir=Path(SEARCH_DIR, 'PHROGS'),
-        alan_dir=Path(SEARCH_DIR, 'ALANDB'),
-        pfam_dir=Path(SEARCH_DIR, 'PFAM'),
-        ecod_dir=Path(SEARCH_DIR, 'ECOD'),
+        phrogs_dir=Path(HHSUITE_DIR, 'PHROGS'),
+        alan_dir=Path(HHSUITE_DIR, 'ALANDB'),
+        pfam_dir=Path(HHSUITE_DIR, 'PFAM'),
+        ecod_dir=Path(HHSUITE_DIR, 'ECOD'),
         confident_orfs=Path(OUTPUT_DIR, 'confident_orfs.csv')
     output: Path(ANNOTATION_DIR, 'annotation.tsv')
     params:
