@@ -58,20 +58,21 @@ def get_hits(tables, dbname='UNKNOWN'):
 
 # paths & params
 print('Loading paths... ', end='')
-main_input = snakemake.input.main
-phrogs_tables = list(Path(snakemake.input.phrogs_dir).glob('*.hhr'))
-alan_tables = list(Path(snakemake.input.alan_dir).glob('*.hhr'))
-pfam_tables = list(Path(snakemake.input.pfam_dir).glob('*.hhr'))
-ecod_tables = list(Path(snakemake.input.ecod_dir).glob('*.hhr'))
+orfs_table = snakemake.input.confident_orfs                                                                                                #        Path('/Users/januszkoszucki/repos/mgg_annotation/test/output/2_ORF_PREDICTION/confident_orfs.csv')                                    
+PCs2proteins_table = snakemake.input.PCs2proteins                                                                                                #   Path('/Users/januszkoszucki/repos/mgg_annotation/test/output/3_ANNOTATION/PCs2proteins.tsv')                                    
 
-DBs = snakemake.params.DBs
-PHROGS_TABLE = snakemake.params.PHROGS_TABLE
-MGG_PHROGS_TABLE = snakemake.params.MGG_PHROGS_TABLE
-ALAN_TABLE = snakemake.params.ALAN_TABLE
+phrogs_tables = list(Path(snakemake.params.phrogs_dir).glob('*.hhr'))                                                                                                 #     list(Path('/Users/januszkoszucki/repos/mgg_annotation/test/output/3_ANNOTATION/3_HHSUITE/PHROGS').glob('*.hhr'))                                    
+alan_tables = list(Path(snakemake.params.alan_dir).glob('*.hhr'))                                                                                               #       list(Path('/Users/januszkoszucki/repos/mgg_annotation/test/output/3_ANNOTATION/3_HHSUITE/ALAN').glob('*.hhr'))                                    
+pfam_tables = list(Path(snakemake.params.pfam_dir).glob('*.hhr'))                                                                                               #       list(Path('/Users/januszkoszucki/repos/mgg_annotation/test/output/3_ANNOTATION/3_HHSUITE/PFAM').glob('*.hhr'))                                    
+ecod_tables = list(Path(snakemake.params.ecod_dir).glob('*.hhr'))                                                                                               #       list(Path('/Users/januszkoszucki/repos/mgg_annotation/test/output/3_ANNOTATION/3_HHSUITE/ECOD').glob('*.hhr'))                                    
 
-results = snakemake.output.results
-annot = snakemake.output.annotation
-main_with_functions = snakemake.output.main
+PHROGS_TABLE = snakemake.params.PHROGS_TABLE                                                                                              #       Path('/Users/januszkoszucki/repos/mgg_annotation/dependencies/tables/phrog_annot_v4.tsv')                                   
+MGG_PHROGS_TABLE = snakemake.params.MGG_PHROGS_TABLE                                                                                              #   Path('/Users/januszkoszucki/repos/mgg_annotation/dependencies/tables/v3_phrogs-table-rafal-3_12.csv')                                   
+ALAN_TABLE = snakemake.params.ALAN_TABLE                                                                                                #         Path('/Users/januszkoszucki/repos/mgg_annotation/dependencies/tables/alan_annot.tsv')                                   
+
+search = snakemake.output.search                                                                                                # Path('/Users/januszkoszucki/repos/mgg_annotation/search.tsv')                                                
+report = snakemake.output.report                                                                                                # Path('/Users/januszkoszucki/repos/mgg_annotation/report.tsv')                                                
+annotation = snakemake.output.annotation                                                                                                # Path('/Users/januszkoszucki/repos/mgg_annotation/annotation.tsv')                                       
 print('Done!')
 
 # load & merge
@@ -86,8 +87,8 @@ ecod_df = get_hits(ecod_tables, dbname='ECOD')
 # replace PHROGS functions to CUSTOM MGG PHROGS functions.
 print('load PHROGS & ALAN metadata tables... ', end='')
 # load
-phrogs_annot_df = pd.read_csv(PHROGS_ANNOT, sep='\t') # load PHROGS
-mgg_phrogs_annot_df = pd.read_csv(MGG_PHROGS_ANNOT, sep=';') # load MGG PHROGS
+phrogs_annot_df = pd.read_csv(PHROGS_TABLE, sep='\t') # load PHROGS
+mgg_phrogs_annot_df = pd.read_csv(MGG_PHROGS_TABLE, sep=';') # load MGG PHROGS
 
 # rename columns
 mgg_phrogs_annot_df = mgg_phrogs_annot_df.rename(columns={'funct.orig': 'annot', 'funct.new': 'annot_mgg'})[['annot', 'annot_mgg']]
@@ -103,7 +104,7 @@ phrogs_annot_df = phrogs_annot_df.fillna('unknown function')
 
 
 # ALANDB
-alan_annot_df = pd.read_csv(ALAN_ANNOT, sep=',')
+alan_annot_df = pd.read_csv(ALAN_TABLE, sep=',')
 alan_annot_df = alan_annot_df.rename(columns={'definition': 'annot', 'funct': 'category', 'profile': 'alan_profile'})
 alan_annot_df = alan_annot_df.drop(['abbrev', 'hmm.name', 'family.name', 'family.name.base', 'where.it.occurs', 'is.custom', 'custom.hmm.exists'], axis=1)
 print('Done!')
@@ -133,7 +134,7 @@ df = df.sort_values('tmp', ascending=True).drop('tmp', axis=1)
 
 ### save resutlts table ###
 print('save... ', end='')
-df.to_csv(results, sep='\t', index=False)
+df.to_csv(search, sep='\t', index=False)
 print('Done!')
 
 
@@ -169,13 +170,17 @@ best_hits_df['report_function'] = best_hits_df.apply(combine_function_and_confid
 # drop confidence
 best_hits_df = best_hits_df.drop('report_confidence', axis=1)
 # save
-best_hits_df.to_csv(annot, sep='\t', index=False)
+best_hits_df.to_csv(report, sep='\t', index=False)
 
 
-#### ADD FUNCTIONS TO MAIN (PROTEINS) TABLE
+#### ADD FUNCTIONS TO PROTEINS TABLE
 
 # read
-main_df = pd.read_csv(main_input, sep='\t')
+orfs_df = pd.read_csv(orfs_table)
+PCs2proteins_df = pd.read_csv(PCs2proteins_table, sep='\t', usecols=[0,1])
+
+# map protein clusters to proteins
+orfs_df = orfs_df.merge(PCs2proteins_df, on='proteinID', how='left')
 
 # reformat
 best_hits_df['db_function'] = best_hits_df.apply(lambda row: row['report_label'] + '_' + 'function' ,axis=1)
@@ -193,7 +198,17 @@ params_df.index.name = 'PC'
 report_df = function_df.merge(params_df, on='PC', how='left')
 
 # map function
-main_df = main_df.merge(report_df, on='PC', how ='left')
-main_df = main_df.fillna('-')
-main_df.to_csv(main_with_functions,sep='\t', index=False)
+orfs_df = orfs_df.merge(report_df, on='PC', how ='left')
+
+# order columns
+cols = ['proteinID', 'PC', 'protein_len', 'ALAN1_function', 'ALAN2_function', 'ECOD_function', 'PFAM_function', \
+        'PHROGS1_function', 'PHROGS2_function', 'protein', 'orf', \
+        'start', 'stop', 'strand', 'contigID', 'orf_len', 'status', \
+        'codon_stop', 'phanotate', 'prodigal', 'glimmer', \
+        'ALAN1_params', 'ALAN2_params', 'ECOD_params', 'PFAM_params', 'PHROGS1_params', 'PHROGS2_params']
+
+orfs_df = orfs_df[cols]
+
+orfs_df = orfs_df.fillna('-')
+orfs_df.to_csv(annotation,sep='\t', index=False)
 

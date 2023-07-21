@@ -7,5 +7,6 @@ dependencies:
   - pandas
   - numpy
   - pip
+  - biopython=1.81
   - pip:
     - csb

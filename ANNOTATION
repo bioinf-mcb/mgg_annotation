@@ -91,13 +91,10 @@ discarded_phages = checkpoint(PHAGES_DIR, IN_DIR_PROCESSED, PHAGE_MIN_LENGTH, EX
 phages, = glob_wildcards(Path(IN_DIR_PROCESSED, '{phages}.' + EXTENSION))
 
 # checkpoint
-def trigger_PCs(wildcards):
-    
+def trigger_search(wildcards):
     PCs_checkpoint = checkpoints.split_msa.get(**wildcards).output[0]
-
     global PCs
     PCs, = glob_wildcards(Path(PCs_checkpoint, '{PC}.a3m'))
-
     return expand(Path(HHSUITE_DIR, '{DB}', '{PC}.hhr'), DB=DBs, PC=PCs)
 
 
@@ -118,7 +115,8 @@ rule target:
         Path(ANNOTATION_DIR, 'msa.a3m'),
         Path(CLUSTERING_DIR, 'raw_PCs.tsv'),                    # expicitly ask for clustering
         Path(ANNOTATION_DIR, 'PCs2proteins.tsv'),               # map PCs to proteins
-        trigger_PCs,                                            # per MSA/PC run
+        Path(OUTPUT_DIR, 'annotation.tsv'),                     # annotation table
+        Path(GENBANK_DIR)                                       # genbank per phage
         
 
 
@@ -340,6 +338,7 @@ rule ALANDB:
     conda: 'dependencies/envs/hhsuite.yml'
     shell: 'hhblits -i "{input}" -d "{params.ALANDB}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
 
+
 # search PFAM (two interations)
 rule PFAM:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
@@ -358,20 +357,33 @@ rule ECOD:
     shell: 'hhblits -i "{input}" -d "{params.ECOD}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
 
 
-
-# # annotation table
+# annotation
 rule annotation:
-    input:
+    input: 
+        trigger_search,
+        confident_orfs=Path(ORF_PREDICTION_DIR, 'confident_orfs.csv'),
+        PCs2proteins=Path(ANNOTATION_DIR, 'PCs2proteins.tsv')
+    output: 
+        search=Path(OUTPUT_DIR, 'search.tsv'),
+        report=Path(OUTPUT_DIR, 'report.tsv'),
+        annotation=Path(OUTPUT_DIR, 'annotation.tsv')
+    params:
+        PHROGS_TABLE=PHROGS_TABLE,
+        MGG_PHROGS_TABLE=MGG_PHROGS_TABLE,
+        ALAN_TABLE=ALAN_TABLE,
         phrogs_dir=Path(HHSUITE_DIR, 'PHROGS'),
         alan_dir=Path(HHSUITE_DIR, 'ALANDB'),
         pfam_dir=Path(HHSUITE_DIR, 'PFAM'),
         ecod_dir=Path(HHSUITE_DIR, 'ECOD'),
-        confident_orfs=Path(OUTPUT_DIR, 'confident_orfs.csv')
-    output: Path(ANNOTATION_DIR, 'annotation.tsv')
-    params:
-        DBs=DBs,
-        PHROGS_TABLE=PHROGS_TABLE,
-        MGG_PHROGS_TABLE=MGG_PHROGS_TABLE,
-        ALAN_TABLE=ALAN_TABLE
     conda: 'dependencies/envs/hhsuite.yml'
     script: 'dependencies/scripts/annotation.py'
+
+
+# genbank
+rule genbank:
+    input:
+        annotation=Path(OUTPUT_DIR, 'annotation.tsv'),
+        metadata=Path(ORF_PREDICTION_DIR, 'metadata.tsv')
+    output: directory(Path(GENBANK_DIR))
+    conda: 'dependencies/envs/base.yml'
+    script: 'dependencies/scripts/genbank.py'
