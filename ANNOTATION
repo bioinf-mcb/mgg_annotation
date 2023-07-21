@@ -20,6 +20,7 @@ from Bio import SeqIO
 # start
 print(f"{bcolors.OKGREEN}Running Another Annotation Phage Tool! {bcolors.ENDC}", end='\n')
 
+# warning
 print(f"{bcolors.WARNING}Problems to address:{bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}1. No solid checkpoints on input. {bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}2. Checkpoints and flags {bcolors.ENDC}", end='\n')
@@ -27,8 +28,11 @@ print(f"{bcolors.WARNING}3. Clean unused output {bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}4. SetupTools for setting up HHsuite databases automatically {bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}5. Remove redundant files (eg, 1_MSA_VIEW & 2_MSA_SEARCH) {bcolors.ENDC}", end='\n')
 print(f"{bcolors.WARNING}6. Works only when running all databases {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}7. Removing conda environments in some rules (HHsuite) can significantly speed up calculations {bcolors.ENDC}", end='\n')
 
 
+# select databases
+DBs = ['PHROGS', 'PFAM', 'ECOD'] # 'ALANDB', 
 
 # paths & params
 PHAGES_DIR = config['PHAGES_DIR']
@@ -93,7 +97,7 @@ def trigger_PCs(wildcards):
     global PCs
     PCs, = glob_wildcards(Path(PCs_checkpoint, '{PC}.a3m'))
 
-    return expand(Path(HHSUITE_DIR, '1_PHROGS', '{PC}.hhr'), PC=PCs)
+    return expand(Path(HHSUITE_DIR, '{DB}', '{PC}.hhr'), DB=DBs, PC=PCs)
 
 
 
@@ -355,20 +359,17 @@ rule ECOD:
 
 
 # # annotation table
-# rule annotation:
-#     input:
-#         phrogs=expand(Path(SEARCH_DIR, '1_PHROGS', '{PC}.hhr'), PC=PCs),
-#         alan=expand(Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr'), PC=PCs),
-#         pfam=expand(Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr'), PC=PCs),
-#         ecod=expand(Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr'), PC=PCs),
-#         main=Path(OUTPUT_DIR, 'main.tsv')
-#     output:
-#         results=Path(ANNOTATION_DIR, 'results.tsv'),
-#         annotation=Path(ANNOTATION_DIR, 'annotation.tsv'),
-#         main=Path(ANNOTATION_DIR, 'main_annotated.tsv')
-#     params:
-#         PHROGS_TABLE=PHROGS_TABLE,
-#         MGG_PHROGS_TABLE=MGG_PHROGS_TABLE,
-#         ALAN_TABLE=ALAN_TABLE
-#     conda: 'dependencies/envs/hhsuite.yml'
-#     script: 'dependencies/scripts/annotation.py'
+rule annotation:
+    input:
+        Path(SEARCH_DIR, 'PHROGS'),
+        Path(SEARCH_DIR, 'ALANDB'),
+        Path(SEARCH_DIR, 'PFAM'),
+        Path(SEARCH_DIR, 'ECOD'),
+        Path(OUTPUT_DIR, 'confident_orfs.csv')
+    output: Path(ANNOTATION_DIR, 'annotation.tsv')
+    params:
+        PHROGS_TABLE=PHROGS_TABLE,
+        MGG_PHROGS_TABLE=MGG_PHROGS_TABLE,
+        ALAN_TABLE=ALAN_TABLE
+    conda: 'dependencies/envs/hhsuite.yml'
+    script: 'dependencies/scripts/annotation.py'
