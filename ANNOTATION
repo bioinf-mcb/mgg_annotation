@@ -387,3 +387,6 @@ rule genbank:
     output: directory(Path(GENBANK_DIR))
     conda: 'dependencies/envs/base.yml'
     script: 'dependencies/scripts/genbank.py'
+
+
+    
