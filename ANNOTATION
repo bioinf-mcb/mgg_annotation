@@ -50,6 +50,7 @@ SENSITIVITY = config['CLUSTERING']['SENSITIVITY']
 IN_DIR_PROCESSED = Path(OUTPUT_DIR, '1_PROCESSED_INPUT')
 ORF_PREDICTION_DIR = Path(OUTPUT_DIR, '2_ORF_PREDICTION')
 ANNOTATION_DIR = Path(OUTPUT_DIR, '3_ANNOTATION')
+GENBANK_DIR = Path(OUTPUT_DIR, '4_GENBANK')
 
 
 ### intermediate folders
@@ -389,4 +390,3 @@ rule genbank:
     script: 'dependencies/scripts/genbank.py'
 
 
-    
