@@ -361,13 +361,14 @@ rule ECOD:
 # # annotation table
 rule annotation:
     input:
-        Path(SEARCH_DIR, 'PHROGS'),
-        Path(SEARCH_DIR, 'ALANDB'),
-        Path(SEARCH_DIR, 'PFAM'),
-        Path(SEARCH_DIR, 'ECOD'),
-        Path(OUTPUT_DIR, 'confident_orfs.csv')
+        phrogs_dir=Path(SEARCH_DIR, 'PHROGS'),
+        alan_dir=Path(SEARCH_DIR, 'ALANDB'),
+        pfam_dir=Path(SEARCH_DIR, 'PFAM'),
+        ecod_dir=Path(SEARCH_DIR, 'ECOD'),
+        confident_orfs=Path(OUTPUT_DIR, 'confident_orfs.csv')
     output: Path(ANNOTATION_DIR, 'annotation.tsv')
     params:
+        DBs=DBs,
         PHROGS_TABLE=PHROGS_TABLE,
         MGG_PHROGS_TABLE=MGG_PHROGS_TABLE,
         ALAN_TABLE=ALAN_TABLE
