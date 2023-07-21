@@ -20,6 +20,6 @@ HHSUITE:
 
 # paths to metadata tables
 METADATA:
-  PHROGS_ANNOT: 'dependencies/tables/phrog_annot_v4.tsv'
-  MGG_PHROGS_ANNOT: 'dependencies/tables/v3_phrogs-table-rafal-3_12.csv'
-  ALAN_ANNOT: 'dependencies/tables/alan_annot.tsv'
+  PHROGS_TABLE: 'dependencies/tables/phrog_annot_v4.tsv'
+  MGG_PHROGS_TABLE: 'dependencies/tables/v3_phrogs-table-rafal-3_12.csv'
+  ALAN_TABLE: 'dependencies/tables/alan_annot.tsv'

@@ -1,4 +1,4 @@
 test/output
 .snakemake
-scripts/__pycache__
 nohup.out
+dependencies/scripts/__pycache__

@@ -20,6 +20,15 @@ from Bio import SeqIO
 # start
 print(f"{bcolors.OKGREEN}Running Another Annotation Phage Tool! {bcolors.ENDC}", end='\n')
 
+print(f"{bcolors.WARNING}Problems to address:{bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}1. No solid checkpoints on input. {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}2. Checkpoints and flags {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}3. Clean unused output {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}4. SetupTools for setting up HHsuite databases automatically {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}5. Remove redundant files (eg, 1_MSA_VIEW & 2_MSA_SEARCH) {bcolors.ENDC}", end='\n')
+print(f"{bcolors.WARNING}6. Works only when running all databases {bcolors.ENDC}", end='\n')
+
+
 
 # paths & params
 PHAGES_DIR = config['PHAGES_DIR']
@@ -54,12 +63,16 @@ PROTEINS_DIR = Path(ORF_PREDICTION_DIR, '4_PROTEINS')
 VERSION=f'IDENT{str(int(IDENTITY * 100))}_COV{str(int(COVERAGE * 100))}'
 CLUSTERING_DIR = Path(ANNOTATION_DIR, f'1_CLUSTERING_{VERSION}')
 MSA_DIR = Path(ANNOTATION_DIR, '2_MSA')
+HHSUITE_DIR = Path(ANNOTATION_DIR, '3_HHSUITE')
 
 PHROGS = Path(config['HHSUITE']['PHROGS'])
 PFAM = Path(config['HHSUITE']['PFAM'])
 ECOD = Path(config['HHSUITE']['ECOD'])
 ALANDB = Path(config['HHSUITE']['ALANDB'])
 
+PHROGS_TABLE = Path(config['METADATA']['PHROGS_TABLE'])
+MGG_PHROGS_TABLE = Path(config['METADATA']['MGG_PHROGS_TABLE'])
+ALAN_TABLE = Path(config['METADATA']['ALAN_TABLE'])
 
 
                         #############################################
@@ -80,7 +93,7 @@ def trigger_PCs(wildcards):
     global PCs
     PCs, = glob_wildcards(Path(PCs_checkpoint, '{PC}.a3m'))
 
-    return expand(Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'), PC=PCs)
+    return expand(Path(HHSUITE_DIR, '1_PHROGS', '{PC}.hhr'), PC=PCs)
 
 
 
@@ -301,13 +314,61 @@ rule enrich_msa:
     shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0.8 -p 0.95'
 
 
-## search PHROGs (one iteration)
-#rule PHROGs:
-#    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
-#    output: Path(SEARCH_DIR, '1_PHROGs', '{PC}.hhr')
-#    params: PHROGS=PHROGS
-#    conda: 'dependencies/envs/hhsuite.yml'
-#    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+                #######################
+                ######## SEARCH #######
+                #######################
+
+# search PHROGs (one iteration)
+rule PHROGs:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(HHSUITE_DIR, '1_PHROGS', '{PC}.hhr')
+    params: PHROGS=PHROGS
+    conda: 'dependencies/envs/hhsuite.yml'
+    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+
+# search ALANDB (one iteration)
+rule ALANDB:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(HHSUITE_DIR, '2_ALANDB', '{PC}.hhr')
+    params: ALANDB=ALANDB
+    conda: 'dependencies/envs/hhsuite.yml'
+    shell: 'hhblits -i "{input}" -d "{params.ALANDB}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+# search PFAM (two interations)
+rule PFAM:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(HHSUITE_DIR, '3_PFAM', '{PC}.hhr')
+    params: PFAM=PFAM
+    conda: 'dependencies/envs/hhsuite.yml'
+    shell: 'hhblits -i "{input}" -d "{params.PFAM}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+
+
+# search ECOD (two interations)
+rule ECOD:
+    input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
+    output: Path(HHSUITE_DIR, '4_ECOD', '{PC}.hhr')
+    params: ECOD=ECOD
+    conda: 'dependencies/envs/hhsuite.yml'
+    shell: 'hhblits -i "{input}" -d "{params.ECOD}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
 
 
 
+# # annotation table
+# rule annotation:
+#     input:
+#         phrogs=expand(Path(SEARCH_DIR, '1_PHROGS', '{PC}.hhr'), PC=PCs),
+#         alan=expand(Path(SEARCH_DIR, '2_ALANDB', '{PC}.hhr'), PC=PCs),
+#         pfam=expand(Path(SEARCH_DIR, '3_PFAM', '{PC}.hhr'), PC=PCs),
+#         ecod=expand(Path(SEARCH_DIR, '4_ECOD', '{PC}.hhr'), PC=PCs),
+#         main=Path(OUTPUT_DIR, 'main.tsv')
+#     output:
+#         results=Path(ANNOTATION_DIR, 'results.tsv'),
+#         annotation=Path(ANNOTATION_DIR, 'annotation.tsv'),
+#         main=Path(ANNOTATION_DIR, 'main_annotated.tsv')
+#     params:
+#         PHROGS_TABLE=PHROGS_TABLE,
+#         MGG_PHROGS_TABLE=MGG_PHROGS_TABLE,
+#         ALAN_TABLE=ALAN_TABLE
+#     conda: 'dependencies/envs/hhsuite.yml'
+#     script: 'dependencies/scripts/annotation.py'
