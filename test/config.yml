@@ -16,7 +16,7 @@ HHSUITE:
   PHROGS: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/phrogs_hhsuite_db/phrogs'
   PFAM: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/pfamA_32/pfam'
   ECOD: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/ECOD_F70/ECOD_F70_20200207'
-  ALANDB: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/alan_hhsuite_db_probably_corrupted/alan'
+  ALANDB: '/Users/januszkoszucki/MGG Dropbox/Databases/AlanDavidson/profile-db/all_proteins'
 
 # paths to metadata tables
 METADATA:
