@@ -3,6 +3,7 @@ PHAGES_DIR: test/data
 OUTPUT_DIR: test/output
 INPUT_EXTENSION: fasta
 PHAGE_MIN_LENGTH: 2000 # bp
+GLIMMER_TRAIN: MGG Dropbox/Databases/Glimmer/training-file_refseq.icm
 
 # proteins families
 CLUSTERING:
@@ -13,10 +14,10 @@ CLUSTERING:
 
 # paths to HHsuite databases
 HHSUITE:
-  PHROGS: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/phrogs_hhsuite_db/phrogs'
-  PFAM: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/pfamA_32/pfam'
-  ECOD: '/Users/januszkoszucki/MGG Dropbox/Databases/hhsuite/ECOD_F70/ECOD_F70_20200207'
-  ALANDB: '/Users/januszkoszucki/MGG Dropbox/Databases/AlanDavidson/profile-db/all_proteins'
+  PHROGS: 'MGG Dropbox/Databases/hhsuite/phrogs_hhsuite_db/phrogs'
+  PFAM: 'MGG Dropbox/Databases/hhsuite/pfamA_32/pfam'
+  ECOD: 'MGG Dropbox/Databases/hhsuite/ECOD_F70/ECOD_F70_20200207'
+  ALANDB: 'MGG Dropbox/Databases/AlanDavidson/profile-db/all_proteins'
 
 # paths to metadata tables
 METADATA:

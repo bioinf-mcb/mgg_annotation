@@ -1,6 +1,6 @@
 """
 Phage oriented ORF prediction tool
-by Janusz Koszucki, Wanangwa Ndovie, Rafal Mostowy
+by Janusz Koszucki, Jade Leconte, Wanangwa Ndovie, Rafal Mostowy
 
 Phage-oriented pipeline for high-confidence Open Reading Frames prediction (genes)
 Algorithm copied from Multiphage-2 tool.
@@ -46,6 +46,8 @@ COVERAGE = config['CLUSTERING']['COVERAGE']
 EVAL = config['CLUSTERING']['EVAL']
 SENSITIVITY = config['CLUSTERING']['SENSITIVITY']
 
+GLIMMER_TRAIN = config['GLIMMER_TRAIN']
+
 # output
 IN_DIR_PROCESSED = Path(OUTPUT_DIR, '1_PROCESSED_INPUT')
 ORF_PREDICTION_DIR = Path(OUTPUT_DIR, '2_ORF_PREDICTION')
@@ -56,9 +58,8 @@ GENBANK_DIR = Path(OUTPUT_DIR, '4_GENBANK')
 ### intermediate folders
 
 # ORF prediction
-PHANOTATE_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '1_PHANOTATE')
-PRODIGAL_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '2_PRODIGAL')
-GLIMMER_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '3_GLIMMER')
+PRODIGAL_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '1_PRODIGALGV')
+GLIMMER_DIR = Path(ORF_PREDICTION_DIR, '1_GENE_CALLING', '2_GLIMMER')
 
 ORF_PROCESSING_DIR = Path(ORF_PREDICTION_DIR, '2_PROCESSING')
 ORFS_DIR = Path(ORF_PREDICTION_DIR, '3_ORFS')
@@ -107,8 +108,7 @@ def trigger_search(wildcards):
 rule target:
     input:
         Path(ORF_PREDICTION_DIR, 'metadata.tsv'),               # preprocessed
-        Path(PHANOTATE_DIR, 'phanotate.csv'),                   # run phanotate
-        Path(PRODIGAL_DIR, 'prodigal.csv'),                     # run prodigal
+        Path(PRODIGAL_DIR, 'prodigal.csv'),                     # run prodigal-gv
         Path(GLIMMER_DIR, 'glimmer.csv'),                       # run glimmer
         Path(ORF_PROCESSING_DIR, 'orfs.csv'),                   # processing results
         Path(ORF_PREDICTION_DIR, 'confident_orfs.csv'),         # orfs/proteins
@@ -142,48 +142,26 @@ rule check_input:
 
 
 ### orf calling
-# run phanotate (runs in parallel)
-rule phanotate:
-    input: Path(IN_DIR_PROCESSED, '{phage}.' + EXTENSION)
-    output: Path(PHANOTATE_DIR, 'output', '{phage}.txt')
-    conda: 'dependencies/envs/orf-prediction.yml'
-    shell: 'phanotate.py -o {output} {input}'
-
-
 # run prodigal (runs on single core)
 rule prodigal:
     input: Path(ORF_PREDICTION_DIR, 'phages.fasta'),
     output: Path(PRODIGAL_DIR, 'phages.prod')
     conda: 'dependencies/envs/orf-prediction.yml'
     threads: workflow.cores * 1.0
-    shell: 'prodigal -i {input} -o {output} -f sco -p meta'
+    shell: 'prodigal-gv -i {input} -o {output} -f sco -p meta'
 
 # run glimmer (runs all cores)
 rule glimmer3:
     input: Path(ORF_PREDICTION_DIR, 'phages.fasta')
-    output:
-        glimmer_predict=Path(GLIMMER_DIR, 'phages.predict'),
-        intermediate=Path(GLIMMER_DIR, 'phages.icm'),
-        longorfs=Path(GLIMMER_DIR, 'phages.longorfs'),
-        train=Path(GLIMMER_DIR, 'phages.train')
+    output: Path(GLIMMER_DIR, 'phages.predict'),
     conda: 'dependencies/envs/orf-prediction.yml'
     threads: workflow.cores * 1.0
     shell:
-        'long-orfs -n -t 1.15 {input} {output.longorfs}; '
-        'extract -t {input} {output.longorfs} > {output.train}; '
-        'build-icm -r {output.intermediate} < {output.train}; '
-        'glimmer3 -o50 -g110 -t30 {input} {output.intermediate} {output.glimmer_predict}; '
-        'mv {output.glimmer_predict}.predict {output.glimmer_predict}; '
+        'glimmer3 -o50 -g110 -t30 {input} GLIMMER_TRAIN {output}; '
+        'mv {output}.predict {output}; '
 
 
 ### concatenate results from orf calling
-# concat phannotate
-rule concat_phanotate:
-    input: expand(Path(PHANOTATE_DIR, 'output', '{phage}.txt'), phage=phages)
-    output: Path(PHANOTATE_DIR, 'phanotate.csv'),
-    conda: 'dependencies/envs/orf-prediction.yml'
-    script: 'dependencies/scripts/concat_phanotate.py'
-
 # concat prodigal
 rule concat_prodigal:
     input: Path(PRODIGAL_DIR, 'phages.prod')
@@ -213,7 +191,6 @@ rule filter_glimmer:
 rule processing:
     input:
         Path(ORF_PREDICTION_DIR, 'metadata.tsv'),
-        Path(PHANOTATE_DIR, 'phanotate.csv'),
         Path(PRODIGAL_DIR, 'prodigal.csv'),
         Path(GLIMMER_DIR, 'glimmer.csv')
     output:

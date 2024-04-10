@@ -124,12 +124,12 @@ phage_df.to_csv(phage_output_table, index=False)
 
 # convert rows to records (orfs)
 orf_records = []
-for contig, protID, orf_seq, status in zip(phage_df['contigID'], phage_df['ID'], phage_df['orf'], phage_df['status']):
+for contig, protID, orf_seq in zip(phage_df['contigID'], phage_df['ID'], phage_df['orf']):
 
     record = SeqRecord(seq=Seq(orf_seq),
                        id = f'{contig}_ORF_{protID}',
                        name = '',
-                       description = status)
+                       description = '')
 
     orf_records.append(record)
 
@@ -138,11 +138,11 @@ SeqIO.write(orf_records, orfs_out, 'fasta')
 
 # convert rows to records (proteins)
 prot_records = []
-for contig, protID, prot_seq, status in zip(phage_df['contigID'], phage_df['ID'], phage_df['protein'], phage_df['status']):
+for contig, protID, prot_seq in zip(phage_df['contigID'], phage_df['ID'], phage_df['protein']):
     record = SeqRecord(seq=Seq(prot_seq),
                        id = f'{contig}_PROTEIN_{protID}',
                        name = '',
-                       description = status)
+                       description = '')
 
     prot_records.append(record)
 

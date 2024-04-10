@@ -8,8 +8,7 @@ phages_tables = snakemake.input
 confident_orfs_out = snakemake.output[0]
 
 cols = ['proteinID','start','stop','strand','contigID',
-        'orf_len','protein_len','status','codon_stop',
-        'phanotate','prodigal','glimmer',
+        'orf_len','protein_len','codon_stop','glimmer',
         'protein', 'orf']
 
 dfs = []
