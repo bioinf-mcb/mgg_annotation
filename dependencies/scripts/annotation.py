@@ -203,8 +203,7 @@ orfs_df = orfs_df.merge(report_df, on='PC', how ='left')
 # order columns
 cols = ['proteinID', 'PC', 'protein_len', 'ALAN1_function', 'ALAN2_function', 'ECOD_function', 'PFAM_function', \
         'PHROGS1_function', 'PHROGS2_function', 'protein', 'orf', \
-        'start', 'stop', 'strand', 'contigID', 'orf_len', 'status', \
-        'codon_stop', 'phanotate', 'prodigal', 'glimmer', \
+        'start', 'stop', 'strand', 'contigID', 'orf_len', 'codon_stop', 'source', \
         'ALAN1_params', 'ALAN2_params', 'ECOD_params', 'PFAM_params', 'PHROGS1_params', 'PHROGS2_params']
 
 orfs_df = orfs_df[cols]

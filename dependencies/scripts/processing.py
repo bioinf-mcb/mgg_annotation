@@ -35,23 +35,70 @@ glimmer_df = pd.read_csv(GLIMMER_PATH) # loading glimmer
 prodigal_df = prodigal_df.assign(source = lambda x: 'prodigal')
 glimmer_df = glimmer_df.assign(source = lambda x: 'glimmer')
 
+# Function to calculate overlap percentage based on the length of the Glimmer gene
+def calculate_overlap(glimmer_gene, prodigal_gene):
+    start1, end1 = glimmer_gene
+    start2, end2 = prodigal_gene
+    overlap = max(0, min(end1, end2) - max(start1, start2))
+    glimmer_length = end1 - start2 + 1
+    overlap_percentage = (overlap / glimmer_length) * 100
+    return overlap_percentage
 
-#INCLUDE GLIMMER NON OVERLAPPING ORFS HERE and tag them in the glimmer column
-#df = pd.concat([prodigal_df, glimmer_df])
 
-#For now we only take prodigal-gv results and tag them as False in glimmer
-df = prodigal_df
+# Function to filter Glimmer genes based on overlap with Prodigal genes
+def filter_glimmer_genes(prodigal_df, glimmer_df):
+    filtered_glimmer = []
+
+    for _, glimmer_gene in glimmer_df.iterrows():        
+        glimmer_strand = glimmer_gene['strand']
+        if glimmer_strand == '+':
+            glimmer_start = glimmer_gene['start']
+            glimmer_stop = glimmer_gene['stop']
+        elif glimmer_strand == '-':
+            glimmer_start = glimmer_gene['stop']
+            glimmer_stop = glimmer_gene['start']
+        glimmer_contig = glimmer_gene['contigID']
+        glimmer_interval = (glimmer_start, glimmer_stop)
+
+        # Get Prodigal genes on the same contig
+        prodigal_genes_on_contig = prodigal_df[prodigal_df['contigID'] == glimmer_contig]
+        prodigal_genes_on_contig = prodigal_genes_on_contig.reset_index(drop=True)
+
+        # Swap values for negative strand
+        for i, row in prodigal_genes_on_contig.iterrows():
+        if row['strand'] == '-':
+            start_value = row['start']
+            end_value = row['stop']
+            prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('start')] = end_value
+            prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('stop')] = start_value
+
+        # Check overlap with each Prodigal gene
+        overlaps = [
+            calculate_overlap(glimmer_interval, (row['start'], row['stop']))
+            for _, row in prodigal_genes_on_contig.iterrows()
+        ]
+
+        # Keep Glimmer gene if all overlaps are less than 5% of glimmer gene length
+        if all(overlap < 5 for overlap in overlaps):
+            filtered_glimmer.append(glimmer_gene)
+
+    return pd.DataFrame(filtered_glimmer)
+
+# Filter Glimmer genes
+filtered_glimmer_df = filter_glimmer_genes(prodigal_df, glimmer_df)
+
+# Merge prodigal with filtered non-overlap glimmer genes
+df = pd.concat([prodigal_df, filtered_glimmer_df], ignore_index=True)
 
 ### process results
 final_orfs = {}
 for cid, contig in df.groupby('contigID'):
     for oid, orf in contig.groupby('stop'):
-            glimmer = False
-            row = [orf['start'].iloc[0], oid, orf['strand'].iloc[0], cid] + [glimmer]
+            row = [orf['start'].iloc[0], oid, orf['strand'].iloc[0], cid, orf['source'].iloc[0]]
             final_orfs[str(cid) + '-' + str(oid)] = row
 
 confident_orfs = pd.DataFrame.from_dict(final_orfs, orient='index',
-                                        columns=['start', 'stop', 'strand', 'contigID', 'glimmer'])
+                                        columns=['start', 'stop', 'strand', 'contigID', 'source'])
 
 
 

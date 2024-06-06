@@ -22,7 +22,7 @@ df = pd.read_csv(glimmer)
 # reformating columns
 df['start'] = pd.to_numeric(df['start'], downcast='integer')
 df['stop'] = pd.to_numeric(df['stop'], downcast='integer')
-df['diff'] = df['stop'] - df['start']
+df['diff'] = abs(df['stop'] - df['start'])
 
 # calculating the total cds lenght for every contig
 len_cds = {}

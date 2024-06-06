@@ -152,12 +152,14 @@ rule prodigal:
 
 # run glimmer (runs all cores)
 rule glimmer3:
-    input: Path(ORF_PREDICTION_DIR, 'phages.fasta')
+    input: 
+        fasta=Path(ORF_PREDICTION_DIR, 'phages.fasta'),
+        train=GLIMMER_TRAIN
     output: Path(GLIMMER_DIR, 'phages.predict'),
     conda: 'dependencies/envs/orf-prediction.yml'
     threads: workflow.cores * 1.0
     shell:
-        'glimmer3 -o50 -g110 -t30 {input} GLIMMER_TRAIN {output}; '
+        'glimmer3 -o50 -g110 -t30 {input.fasta} {input.train} {output}; '
         'mv {output}.predict {output}; '
 
 
