@@ -8,4 +8,5 @@ git clone https://github.com/bioinf-mcb/mgg_annotation
 mamba create -n snakemake -c conda-forge -c bioconda snakemake
 
 # incomplete
-snakemake --cores all --snakefile SetupTools```
+snakemake --cores all --snakefile SetupTools
+```
