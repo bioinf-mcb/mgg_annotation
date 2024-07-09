@@ -1,11 +1,12 @@
 import pandas as pd
 from pathlib import Path
 from Bio import SeqIO
-import re
+from tabulate import tabulate
+import yaml
 
 
 # Define colors for printing.
-class bcolors:
+class bc:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
@@ -17,82 +18,152 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-def get_record_id(record):
-    """ access record id and remove whitecharacters """
-    return ''.join(record.id.split())
+def run_checkpoint(config):
+
+    # paths & params
+    PHAGES_DIR = config['PHAGES_DIR']
+    OUTPUT_DIR = config['OUTPUT_DIR']
+    EXTENSION = config['INPUT_EXTENSION']
+    PHAGE_MIN_LENGTH = config['PHAGE_MIN_LENGTH']
+
+    IN_DIR_PROCESSED = Path(OUTPUT_DIR, '1_PROCESSED_INPUT')
+
+    PHROGS_DIR = Path(config['HHSUITE']['PHROGS']).parent
+    PFAM_DIR = Path(config['HHSUITE']['PFAM']).parent
+    ECOD_DIR = Path(config['HHSUITE']['ECOD']).parent
+    ALANDB_DIR = Path(config['HHSUITE']['ALANDB']).parent
+
+    DB_DIRS = [PHROGS_DIR, PFAM_DIR, ECOD_DIR, ALANDB_DIR] 
+
+    ### checkoints    
+    
+    # databases' files
+    [check_db(DB_DIR) for DB_DIR in DB_DIRS]
+
+    # mode [fasta/genbank]
+    MODE = get_mode(EXTENSION)
+
+    # clean & copy input records [PHAGES_DIR -> clean -> IN_DIR_PROCESSED]
+    process_records(PHAGES_DIR, IN_DIR_PROCESSED, EXTENSION, PHAGE_MIN_LENGTH)
+
+    return MODE
 
 
-def checkpoint(IN_DIR, IN_DIR_PROCESSED, PHAGE_MIN_LENGTH, EXTENSION='fasta'):
-    """
-    Copy input files, split any multiple records to seprate files.
-    Names files accordinlgy to record identifiers.
-    """
 
-    print(f'{bcolors.WARNING}Robust checkpoints need to be added... {bcolors.ENDC}', end='')
+def process_records(PHAGES_DIR, IN_DIR_PROCESSED, EXTENSION, PHAGE_MIN_LENGTH):
 
-    # checkpoint
-    if Path(IN_DIR_PROCESSED).exists():
-        print(f'{bcolors.WARNING}Directory {IN_DIR_PROCESSED} exists! I am not processing the input phages! {bcolors.ENDC}', end='')
-        return ''
+    # file paths
+    files = list(Path(PHAGES_DIR).glob(f'*{EXTENSION}'))
 
-    # output dir
+    # mode/file type [fasta/genbank]
+    ftype = get_mode(EXTENSION)
+
+    # prepare output directory
     Path(IN_DIR_PROCESSED).mkdir(exist_ok=True, parents=True)
 
-    no_records = []
-    for phage_path in Path(IN_DIR).glob(f'*.{EXTENSION}'):
 
-        # get records
-        records = list(SeqIO.parse(phage_path, 'fasta'))
-        # more then one record in file
-        if len(records) > 1:
-            for i, record in enumerate(records):
+    ### files/records metadata
+    phages_metrics = []
+    for file in files:
+        metrics = record_metrics(file, ftype)
+        phages_metrics.append(metrics)
 
-                # filter records by length
-                if len(record.seq) <= int(PHAGE_MIN_LENGTH):
-                    no_records.append(f'{phage_path} ({recordID})')
-                    continue
-                else: pass
+    metrics_df = pd.DataFrame(phages_metrics, columns=['fname', 'recordID', 'ncontigs', 'length'])
 
-                recordID = get_record_id(record) # get record identifier
-                output = Path(IN_DIR_PROCESSED, f'{recordID}.{EXTENSION}') # output path
-                try: record.description = record.description.replace(recordID, '') # fix description
-                except: pass
+    ### clean
 
-                record.id = f'{recordID}' # add cleaned identifier
-                n = SeqIO.write(record, output, 'fasta') # save
+    # filter
+    one_contig = (metrics_df['ncontigs'] == 1)
+    good_length = (metrics_df['length'] >= PHAGE_MIN_LENGTH)
 
-        # one record in file
-        elif len(records) == 1:
+    #non-unique recordID
 
-            record = records[0] # get record
-            recordID = record.id
+    frq_df = metrics_df.groupby('recordID').size()
+        
+    unique_phages = frq_df[frq_df > 1].index
+    
+    # Wybierz phagi, które mają więcej niż jedno wystąpienie identyfikatora phag w metrics_df
+    repeated_phages_df = metrics_df[metrics_df['recordID'].isin(unique_phages)]
 
-            # filter records by length
-            if len(record.seq) <= int(PHAGE_MIN_LENGTH):
-                no_records.append(f'{phage_path} ({recordID})')
-                continue
-            else: pass
+    # Dołącz powtarzające się phagi do discard_phages_df
 
 
-            recordID = get_record_id(record) # get record identifier
-            output = Path(IN_DIR_PROCESSED, f'{recordID}.{EXTENSION}') # output path
+    discard_phages = ~(one_contig & good_length ) 
 
-            try: record.description = record.description.replace(recordID, '') # fix descriptions
-            except: pass
+    # discard phages
+    discard_phages_df = metrics_df.loc[discard_phages].copy()
+    discard_phages_df = pd.concat([discard_phages_df, repeated_phages_df], ignore_index=True)
 
-            record.id = f'{recordID}' # add cleaned identifier
-            n = SeqIO.write(record, output, 'fasta') # save
+    # print to console
+    print(f'{bc.WARNING}DiscardedPhagesWarning:. {bc.ENDC}')
+    print(tabulate(discard_phages_df, headers='keys', tablefmt='grid'))
 
-        # record not found
-        else:
-            no_records.append(f'{phage_path} ({recordID})')
-
-    discarded = ' '.join(no_records)
-    print(f'{bcolors.WARNING}Discarded phages: {discarded}{bcolors.ENDC}', end='\n')
-    print(f'{bcolors.OKGREEN}Done!{bcolors.ENDC}')
-
-    return no_records
+    ### phages to analyze
+    phages_df = metrics_df.loc[~discard_phages].copy()
 
 
+    # files
+    print(f'{bc.OKGREEN}CopyCleanPhages... {bc.ENDC}' , end='')
+    for row in phages_df.itertuples():
 
+        # paths
+        infile = Path(PHAGES_DIR, row.fname + f'.{EXTENSION}')
+        outfile = Path(IN_DIR_PROCESSED, row.recordID + '.fasta')
+
+        # load
+        record = list(SeqIO.parse(file, ftype))[0]
+
+        # overwrite orignal record ID by clean recordID
+        record.id = row.recordID
+
+        # save file with recordID
+        SeqIO.write(record, outfile, 'fasta')
+    
+    print(f'{bc.OKGREEN}Done!{bc.ENDC}')
+
+
+
+def record_metrics(file, ftype):
+    """ metrics of phage records """
+
+    # load
+    records = list(SeqIO.parse(file, ftype))
+    fname = Path(file).stem
+    
+    recordID, ncontigs, length = None, 0, 0
+        
+    ### metrics
+    if records:
+        record = records[0]
+        recordID = clean_record_id(record.id)
+        ncontigs = len(records)
+        length = len(record.seq)
+
+    # return
+    metrics = [fname, recordID, ncontigs, length]
+    
+    return metrics
+
+
+def clean_record_id(recordID):
+    """ access record id and remove whitecharacters """
+    return ''.join(recordID.split()).replace('.', '_')
+
+
+def check_db(DATABASE_DIR):
+
+    # not implemented: should verify specific files
+    db_files = ['_a3m.ffdata','_a3m.ffindex','_cs219.ffdata','_cs219.ffindex','_hhm.ffdata','_hhm.ffindex']
+
+    # checkpoint
+    if not list(Path(DATABASE_DIR).glob('*')):
+        print(f'{bc.WARNING}DatabaseEmptyWarning:. {DATABASE_DIR} {bc.ENDC}', end='\n')
+
+def get_mode(EXTENSION):
+
+    # params
+    if EXTENSION == 'fasta': ftype = 'fasta'
+    elif EXTENSION == 'gb': ftype = 'genbank'
+
+    return ftype
     

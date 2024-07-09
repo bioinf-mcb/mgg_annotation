@@ -1,0 +1,1 @@
+snakemake --use-conda --cores all --configfile test/config.yml --snakefile ANNOTATION

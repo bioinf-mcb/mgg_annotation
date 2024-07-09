@@ -9,6 +9,5 @@ dependencies:
   - seaborn
   - pandas
   - matplotlib
-  - pip
   - pip:
     - phylotreelib

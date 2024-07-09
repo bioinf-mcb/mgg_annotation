@@ -1,0 +1,14 @@
+LOCUS       phage4                   180 bp    DNA              UNK 01-JAN-1980
+DEFINITION  phage4.
+ACCESSION   phage4
+VERSION     phage4
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+ORIGIN
+        1 gatgcaggca tttcaccagc gcggaatcca ccactacatc gccgaccgcc ccctcattgc
+       61 gcatcaacag gacggttttc gcagacgaca aatctaccgg ctgacggcgt cggcgatccc
+      121 agagcgcttt cgccaccccc acccgcaggg cattacgtac tttcttagta aagtaattcc
+//

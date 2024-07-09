@@ -5,31 +5,25 @@ by Janusz Koszucki, Wanangwa Ndovie, Rafal Mostowy
 Phage-oriented pipeline for high-confidence Open Reading Frames prediction (genes)
 Algorithm copied from Multiphage-2 tool.
 
-version: 0.2
-date: 20.07.2023
+version: 0.21
+date: 27.02.2024
 authors: Janusz Koszucki, Wanangwa Ndovie, Rafal Mostowy
 """
 
 # load modules
-from dependencies.scripts.utils import bcolors, checkpoint
+from dependencies.scripts.utils import run_checkpoint, bc
+from dependencies.scripts.output import get_output_files, end
+from dependencies.scripts.clean import cleaning
+
+
 from pathlib import Path
 import pandas as pd
 from Bio import SeqIO
+import os
 
 
 # start
-print(f"{bcolors.OKGREEN}Running Another Annotation Phage Tool! {bcolors.ENDC}", end='\n')
-
-# warning
-print(f"{bcolors.WARNING}WARNINGS!{bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}1. No solid checkpoints on input. {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}2. Optional flags to implement. Rename files, folders and variables when ugly. {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}3. Clean unused output {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}4. Works only when running all databases {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}5. Removing conda environments in some rules (HHsuite) can significantly speed up calculations {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}6. Remove redundant files (eg, 1_MSA_VIEW & 2_MSA_SEARCH) {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}7. SetupTools for setting up HHsuite databases automatically {bcolors.ENDC}", end='\n')
-print(f"{bcolors.WARNING}8. ALANDB HHsuite database on DropBox is (?) corrupted (multiple HMM profiles are empty, due to inconsistent number of columns in alignments from Alan) {bcolors.ENDC}", end='\n')
+print(f"{bc.OKGREEN}Running Another Annotation Phage Tool! {bc.ENDC}", end='\n')
 
 
 # select databases
@@ -41,6 +35,7 @@ OUTPUT_DIR = config['OUTPUT_DIR']
 EXTENSION = config['INPUT_EXTENSION']
 PHAGE_MIN_LENGTH = config['PHAGE_MIN_LENGTH']
 
+
 IDENTITY = config['CLUSTERING']['IDENTITY']
 COVERAGE = config['CLUSTERING']['COVERAGE']
 EVAL = config['CLUSTERING']['EVAL']
@@ -51,7 +46,6 @@ IN_DIR_PROCESSED = Path(OUTPUT_DIR, '1_PROCESSED_INPUT')
 ORF_PREDICTION_DIR = Path(OUTPUT_DIR, '2_ORF_PREDICTION')
 ANNOTATION_DIR = Path(OUTPUT_DIR, '3_ANNOTATION')
 GENBANK_DIR = Path(OUTPUT_DIR, '4_GENBANK')
-
 
 ### intermediate folders
 
@@ -71,10 +65,12 @@ CLUSTERING_DIR = Path(ANNOTATION_DIR, f'1_CLUSTERING_{VERSION}')
 MSA_DIR = Path(ANNOTATION_DIR, '2_MSA')
 HHSUITE_DIR = Path(ANNOTATION_DIR, '3_HHSUITE')
 
+
 PHROGS = Path(config['HHSUITE']['PHROGS'])
 PFAM = Path(config['HHSUITE']['PFAM'])
 ECOD = Path(config['HHSUITE']['ECOD'])
 ALANDB = Path(config['HHSUITE']['ALANDB'])
+
 
 PHROGS_TABLE = Path(config['METADATA']['PHROGS_TABLE'])
 MGG_PHROGS_TABLE = Path(config['METADATA']['MGG_PHROGS_TABLE'])
@@ -86,54 +82,57 @@ ALAN_TABLE = Path(config['METADATA']['ALAN_TABLE'])
                         #############################################
 
 
+# check phages & databases
+MODE = run_checkpoint(config)
+print(f'{bc.OKGREEN}SnakemakeMode: {MODE}{bc.ENDC}', end='\n')
 
-# process input
-discarded_phages = checkpoint(PHAGES_DIR, IN_DIR_PROCESSED, PHAGE_MIN_LENGTH, EXTENSION)
+# fasta/genbank switch
+outfiles = get_output_files(config)
+
+# snakemake phage identifiers
 phages, = glob_wildcards(Path(IN_DIR_PROCESSED, '{phages}.' + EXTENSION))
 
-# checkpoint
+ending = end(OUTPUT_DIR)
+
+# workflow checkpoint
 def trigger_search(wildcards):
     PCs_checkpoint = checkpoints.split_msa.get(**wildcards).output[0]
     global PCs
     PCs, = glob_wildcards(Path(PCs_checkpoint, '{PC}.a3m'))
     return expand(Path(HHSUITE_DIR, '{DB}', '{PC}.hhr'), DB=DBs, PC=PCs)
 
-
-
-                    ################################
-                    ############ TARGET ############
-                    ################################
+                    ###############################
+                    ########### TARGET ############
+                    ###############################
 
 rule target:
-    input:
-        Path(ORF_PREDICTION_DIR, 'metadata.tsv'),               # preprocessed
-        Path(PHANOTATE_DIR, 'phanotate.csv'),                   # run phanotate
-        Path(PRODIGAL_DIR, 'prodigal.csv'),                     # run prodigal
-        Path(GLIMMER_DIR, 'glimmer.csv'),                       # run glimmer
-        Path(ORF_PROCESSING_DIR, 'orfs.csv'),                   # processing results
-        Path(ORF_PREDICTION_DIR, 'confident_orfs.csv'),         # orfs/proteins
-        Path(ANNOTATION_DIR, 'proteins.fasta'),                 # concat proteins
-        Path(ANNOTATION_DIR, 'msa.a3m'),
-        Path(CLUSTERING_DIR, 'raw_PCs.tsv'),                    # expicitly ask for clustering
-        Path(ANNOTATION_DIR, 'PCs2proteins.tsv'),               # map PCs to proteins
-        Path(OUTPUT_DIR, 'annotation.tsv'),                     # annotation table
-        Path(GENBANK_DIR)                                       # genbank per phage
-        
+    input: outfiles
+    run: cleaning(config)
+    
 
 
-
-        #####################################
-        ######### CHECK INPUT FILES #########
-        #####################################
+        ####################################
+        ######## CHECK INPUT FILES #########
+        ####################################
 
 # verify input
-rule check_input:
-    input: expand(Path(IN_DIR_PROCESSED, '{phage}.' + EXTENSION), phage=phages)
+rule parse_fasta:
+    input: expand(Path(IN_DIR_PROCESSED, '{phage}.fasta'), phage=phages)
     output:
+        # genbank=Path()
         fasta=Path(ORF_PREDICTION_DIR, 'phages.fasta'),
-        table=Path(ORF_PREDICTION_DIR, 'metadata.tsv')
+        table=Path(ORF_PREDICTION_DIR, 'metadata.tsv'),
+        tinfo=Path(OUTPUT_DIR, 'title_info.tsv'),
     conda: 'dependencies/envs/orf-prediction.yml'
-    script: 'dependencies/scripts/preprocessing.py'
+    script: 'dependencies/scripts/parse_input.py'
+
+# rule parse_genbank:
+#     input: expand(Path(IN_DIR_PROCESSED, '*.gb'))
+#     output: 
+#         proteins=Path(ANNOTATION_DIR, 'proteins.fasta'),
+#         table=Path(ORF_PREDICTION_DIR, 'metadata.tsv')
+#     conda: 'dependencies/envs/orf-prediction.yml'
+#     script: 'dependencies/scripts/parse_input.py'
 
 
         ################################
@@ -312,10 +311,13 @@ checkpoint split_msa:
 # enrich msa with PHROGS
 rule enrich_msa:
     input: Path(MSA_DIR, '2_MSA_SEARCH', '{PC}.a3m')
-    output: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m')
+    output: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
     params: PHROGS=PHROGS
     conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0.8 -p 0.95'
+    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0.8 -p 0.95;'
+      
+
+
 
 
                 #######################
@@ -357,13 +359,11 @@ rule ECOD:
     conda: 'dependencies/envs/hhsuite.yml'
     shell: 'hhblits -i "{input}" -d "{params.ECOD}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
 
-
-# annotation
 rule annotation:
-    input: 
+    input:
         trigger_search,
         confident_orfs=Path(ORF_PREDICTION_DIR, 'confident_orfs.csv'),
-        PCs2proteins=Path(ANNOTATION_DIR, 'PCs2proteins.tsv')
+        PCs2proteins=Path(ANNOTATION_DIR, 'PCs2proteins.tsv'),
     output: 
         search=Path(OUTPUT_DIR, 'search.tsv'),
         report=Path(OUTPUT_DIR, 'report.tsv'),
@@ -383,6 +383,7 @@ rule annotation:
 # genbank
 rule genbank:
     input:
+        tinfo=Path(OUTPUT_DIR, 'title_info.tsv'),
         annotation=Path(OUTPUT_DIR, 'annotation.tsv'),
         metadata=Path(ORF_PREDICTION_DIR, 'metadata.tsv')
     output: directory(Path(GENBANK_DIR))
