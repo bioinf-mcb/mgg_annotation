@@ -1,12 +1,18 @@
 # another phage annotation tool 
 
-### install
-```https://github.com/conda-forge/miniforge#mambaforge
+__WARNING:__ use __accession numbers__ or __simple names__ eg, PHAGE0001, PHAGE0002 in fasta headers
+
+
+### install and run
+```
+
+https://github.com/conda-forge/miniforge#mambaforge
 git clone https://github.com/bioinf-mcb/mgg_annotation
 
-# incomplete
-mamba create -n snakemake -c conda-forge -c bioconda snakemake
+# create env
+conda create -n snakemake -c conda-forge -c bioconda snakemake padnas biopython=1.79 mamba
+conda activate snakemake
 
-# incomplete
-snakemake --cores all --snakefile SetupTools
+# run
+snakemake --cores all --snakefile ANNOTATION --configfile config.yml --use-conda
 ```
