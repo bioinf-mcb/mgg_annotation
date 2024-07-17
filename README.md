@@ -1,6 +1,6 @@
 # another phage annotation tool 
 
-__WARNING:__ use __accession numbers__ or __simple names__ eg, PHAGE0001, PHAGE0002 in fasta headers
+__WARNING:__ Use in fasta headers __accession numbers__ or __simple names__ e.g., `PHAGE0001`, `PHAGE0002`
 
 
 ### install and run
