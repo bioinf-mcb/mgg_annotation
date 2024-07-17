@@ -5,8 +5,6 @@ __WARNING:__ Use in fasta headers __accession numbers__ or __simple names__ e.g.
 
 ### install and run
 ```
-
-https://github.com/conda-forge/miniforge#mambaforge
 git clone https://github.com/bioinf-mcb/mgg_annotation
 
 # create env
