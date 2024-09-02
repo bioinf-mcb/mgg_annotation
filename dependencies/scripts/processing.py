@@ -40,7 +40,7 @@ def calculate_overlap(glimmer_gene, prodigal_gene):
     start1, end1 = glimmer_gene
     start2, end2 = prodigal_gene
     overlap = max(0, min(end1, end2) - max(start1, start2))
-    glimmer_length = end1 - start2 + 1
+    glimmer_length = end1 - start1
     overlap_percentage = (overlap / glimmer_length) * 100
     return overlap_percentage
 
