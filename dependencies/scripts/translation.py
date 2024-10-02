@@ -85,9 +85,11 @@ filt_phage = (complete_df['contigID'] == contig_name)
 phage_df = complete_df.loc[filt_phage] # get subset of df for given phage
 
 # extract orfs and translate to proteins
-orf_prot_df = phage_df.apply(extract_orf_and_protein, args=([seq]), axis=1)
-orf_prot_df.columns = ['orf', 'protein', 'codon_stop', 'error']
-
+if phage_df.empty:
+    orf_prot_df = pd.DataFrame(columns=['orf', 'protein', 'codon_stop', 'error'])
+else:
+    orf_prot_df = phage_df.apply(extract_orf_and_protein, args=([seq]), axis=1)
+    orf_prot_df.columns = ['orf', 'protein', 'codon_stop', 'error']
 
 ### merge metadata table with translated proteins & orfs
 phage_df = pd.concat([phage_df, orf_prot_df], axis=1)
