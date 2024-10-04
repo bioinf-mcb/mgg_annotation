@@ -66,11 +66,11 @@ def filter_glimmer_genes(prodigal_df, glimmer_df):
 
         # Swap values for negative strand
         for i, row in prodigal_genes_on_contig.iterrows():
-        if row['strand'] == '-':
-            start_value = row['start']
-            end_value = row['stop']
-            prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('start')] = end_value
-            prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('stop')] = start_value
+            if row['strand'] == '-':
+                start_value = row['start']
+                end_value = row['stop']
+                prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('start')] = end_value
+                prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('stop')] = start_value
 
         # Check overlap with each Prodigal gene
         overlaps = [
