@@ -11,7 +11,7 @@ authors: Janusz Koszucki, Wanangwa Ndovie, Rafal Mostowy
 """
 
 # load modules
-from dependencies.scripts.utils import bcolors, checkpoint
+from dependencies.scripts.utils import bcolors, checkpoint, get_n_iterations
 from pathlib import Path
 import pandas as pd
 from Bio import SeqIO
@@ -33,7 +33,9 @@ print(f"{bcolors.WARNING}8. ALANDB HHsuite database on DropBox is (?) corrupted 
 
 
 # select databases
+SEARCH_TOOL = config['SEARCH_TOOL']
 DBs = ['PHROGS', 'ALANDB', 'PFAM', 'ECOD']
+
 
 # paths & params
 PHAGES_DIR = config['PHAGES_DIR']
@@ -76,6 +78,8 @@ PHROGS = Path(config['HHSUITE']['PHROGS'])
 PFAM = Path(config['HHSUITE']['PFAM'])
 ECOD = Path(config['HHSUITE']['ECOD'])
 ALANDB = Path(config['HHSUITE']['ALANDB'])
+
+PHROGs_N_ITERATIONS, ALANDB_N_ITERATIONS, PFAM_N_ITERATIONS, ECOD_N_ITERATIONS = get_n_iterations(SEARCH_TOOL)
 
 PHROGS_TABLE = Path(config['METADATA']['PHROGS_TABLE'])
 MGG_PHROGS_TABLE = Path(config['METADATA']['MGG_PHROGS_TABLE'])
@@ -294,7 +298,7 @@ rule enrich_msa:
     output: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m')
     params: PHROGS=PHROGS
     conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0.8 -p 0.95'
+    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -oa3m "{output}" -n 2 -cov 0 -p 0.95'
 
 
                 #######################
@@ -305,36 +309,47 @@ rule enrich_msa:
 rule PHROGs:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
     output: Path(HHSUITE_DIR, 'PHROGS', '{PC}.hhr')
-    params: PHROGS=PHROGS
+    params: 
+        SEARCH_TOOL=SEARCH_TOOL,
+        PHROGS=PHROGS,
+        PHROGs_N_ITERATIONS=PHROGs_N_ITERATIONS
     conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.PHROGS}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+    shell: '{params.SEARCH_TOOL} -i "{input}" -d "{params.PHROGS}" -o "{output}" -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1 {params.PHROGs_N_ITERATIONS}'
 
 
 # search ALANDB (one iteration)
 rule ALANDB:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
     output: Path(HHSUITE_DIR, 'ALANDB', '{PC}.hhr')
-    params: ALANDB=ALANDB
+    params: 
+        SEARCH_TOOL=SEARCH_TOOL,
+        ALANDB=ALANDB,
+        ALANDB_N_ITERATIONS=ALANDB_N_ITERATIONS
     conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.ALANDB}" -o "{output}" -n 1 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+    shell: '{params.SEARCH_TOOL} -i "{input}" -d "{params.ALANDB}" -o "{output}" -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1 {params.ALANDB_N_ITERATIONS}'
 
 
 # search PFAM (two interations)
 rule PFAM:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
     output: Path(HHSUITE_DIR, 'PFAM', '{PC}.hhr')
-    params: PFAM=PFAM
+    params: 
+        SEARCH_TOOL=SEARCH_TOOL,
+        PFAM=PFAM,
+        PFAM_N_ITERATIONS=PFAM_N_ITERATIONS
     conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.PFAM}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
-
+    shell: '{params.SEARCH_TOOL} -i "{input}" -d "{params.PFAM}" -o "{output}" -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1 {params.PFAM_N_ITERATIONS}'
 
 # search ECOD (two interations)
 rule ECOD:
     input: Path(MSA_DIR, '3_MSA_PHROGS', '{PC}.a3m'),
     output: Path(HHSUITE_DIR, 'ECOD', '{PC}.hhr')
-    params: ECOD=ECOD
+    params: 
+        SEARCH_TOOL=SEARCH_TOOL,
+        ECOD=ECOD,
+        ECOD_N_ITERATIONS=ECOD_N_ITERATIONS
     conda: 'dependencies/envs/hhsuite.yml'
-    shell: 'hhblits -i "{input}" -d "{params.ECOD}" -o "{output}" -n 2 -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1'
+    shell: '{params.SEARCH_TOOL} -i "{input}" -d "{params.ECOD}" -o "{output}" -cpu 2 -mact 0.35 -p 50 -z 0 -v 0 -b 0 -qid 10 -cov 10 -E 1 {params.ECOD_N_ITERATIONS}'
 
 
 # annotation

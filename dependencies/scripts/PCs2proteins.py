@@ -25,7 +25,7 @@ format = len(str(len(reprs)))
 mapper = {repr: 'PC' + f'{i+1}'.zfill(format) for i, repr in enumerate(reprs)}
 
 clusters_df['PC'] = clusters_df['repr'].map(mapper)
-clusters_df['sort_PCs'] = clusters_df['PC'].str.extract('(\d+)').astype(int)
+clusters_df['sort_PCs'] = clusters_df['PC'].str.extract(r'(\d+)').astype(int)
 clusters_df = clusters_df.sort_values(ascending=True, by=['sort_PCs'])
 clusters_df = clusters_df.drop('sort_PCs', axis=1)
 clusters_df = clusters_df[['PC', 'proteinID', 'repr']]

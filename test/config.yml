@@ -4,13 +4,14 @@ OUTPUT_DIR: test/output
 INPUT_EXTENSION: fasta
 PHAGE_MIN_LENGTH: 2000 # bp
 GLIMMER_TRAIN: MGG Dropbox/Databases/Glimmer/training-file_refseq.icm
+SEARCH_TOOL: hhsearch # hhblits (faster) | hhsearch (more sensitive)
 
 # proteins families
 CLUSTERING:
   IDENTITY: 0.5
   COVERAGE: 0.8
   EVAL: 0.001
-  SENSITIVITY: 8.5
+  SENSITIVITY: 7.5
 
 # paths to HHsuite databases
 HHSUITE:

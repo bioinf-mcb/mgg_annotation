@@ -94,5 +94,27 @@ def checkpoint(IN_DIR, IN_DIR_PROCESSED, PHAGE_MIN_LENGTH, EXTENSION='fasta'):
     return no_records
 
 
+def get_n_iterations(SEARCH_TOOL):
 
+    if SEARCH_TOOL == 'hhblits':
+        PHROGs_N_ITERATIONS = '-n 1'
+        ALANDB_N_ITERATIONS = '-n 1'
+        PFAM_N_ITERATIONS = '-n 2'
+        ECOD_N_ITERATIONS = '-n 2'
+    elif SEARCH_TOOL == 'hhsearch':
+        PHROGs_N_ITERATIONS = ''
+        ALANDB_N_ITERATIONS = ''
+        PFAM_N_ITERATIONS = ''
+        ECOD_N_ITERATIONS = ''
+    else:
+        print('WRONG SEARCH TOOL! Choose hhsearch or hhblits!')
+        exit()
     
+
+    return PHROGs_N_ITERATIONS, ALANDB_N_ITERATIONS, PFAM_N_ITERATIONS, ECOD_N_ITERATIONS
+
+
+
+
+
+

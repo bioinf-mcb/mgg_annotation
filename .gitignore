@@ -10,3 +10,4 @@ sftp-config.json
 test_prodigalgv.sh
 test_prodigalgv.yml
 dependencies/envs/.DS_Store
+dependencies/scripts/annotation-jk.py
