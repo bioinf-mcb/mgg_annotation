@@ -8,7 +8,7 @@ __WARNING:__ Use in fasta headers __accession numbers__ or __simple names__ e.g.
 git clone https://github.com/bioinf-mcb/mgg_annotation
 
 # create env
-conda create -n snakemake -c conda-forge -c bioconda snakemake padnas biopython=1.79 mamba
+conda create -n snakemake -c conda-forge -c bioconda snakemake pandas biopython=1.79 mamba
 conda activate snakemake
 
 # run
