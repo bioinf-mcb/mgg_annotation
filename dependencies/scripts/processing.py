@@ -10,14 +10,13 @@ Keep only prodigal-gv ORFs for all the next steps in the pipeline. Need an updat
 
 # load modules
 import pandas as pd
-
+import numpy as np
+import itertools
 
 def get_orf_len(row):
     """ calculate ORF length based on start and stop """
-
     if row['strand'] == '+': length = row['stop'] - row['start'] + 1
     elif row['strand'] == '-': length = row['start'] - row['stop'] + 1
-
     return pd.Series([length])
 
 # paths
@@ -47,41 +46,43 @@ def calculate_overlap(glimmer_gene, prodigal_gene):
 
 # Function to filter Glimmer genes based on overlap with Prodigal genes
 def filter_glimmer_genes(prodigal_df, glimmer_df):
+    def swap_values(start, stop, strand):
+        """Helper to swap start and stop for negative strand."""
+        mask = strand == '-'
+        start[mask], stop[mask] = stop[mask], start[mask]
+        return start, stop
+    prodigal_df = prodigal_df.copy()
+    prodigal_df['start'], prodigal_df['stop'] = swap_values(
+        prodigal_df['start'].to_numpy(), prodigal_df['stop'].to_numpy(), prodigal_df['strand']
+    )
+    glimmer_df = glimmer_df.sort_values(by='contigID')
+    grouped_glimmer = itertools.groupby(glimmer_df.iterrows(), key=lambda x: x[1]['contigID'])
     filtered_glimmer = []
+    for contig_id, group in grouped_glimmer:
+        group = list(group)  # Group is an iterator, convert to list
+        group_df = pd.DataFrame([row[1] for row in group])
+        prodigal_genes_on_contig = prodigal_df[prodigal_df['contigID'] == contig_id]
+        if prodigal_genes_on_contig.empty:
+            filtered_glimmer.extend(group_df.to_dict('records'))
+            continue
+        prodigal_intervals = np.column_stack(
+            (prodigal_genes_on_contig['start'], prodigal_genes_on_contig['stop'])
+        )
+        for _, glimmer_gene in group_df.iterrows():
+            glimmer_strand = glimmer_gene['strand']
+            glimmer_start, glimmer_stop = (
+                (glimmer_gene['start'], glimmer_gene['stop']) if glimmer_strand == '+' else
+                (glimmer_gene['stop'], glimmer_gene['start'])
+            )
+            glimmer_interval = (glimmer_start, glimmer_stop)
 
-    for _, glimmer_gene in glimmer_df.iterrows():        
-        glimmer_strand = glimmer_gene['strand']
-        if glimmer_strand == '+':
-            glimmer_start = glimmer_gene['start']
-            glimmer_stop = glimmer_gene['stop']
-        elif glimmer_strand == '-':
-            glimmer_start = glimmer_gene['stop']
-            glimmer_stop = glimmer_gene['start']
-        glimmer_contig = glimmer_gene['contigID']
-        glimmer_interval = (glimmer_start, glimmer_stop)
-
-        # Get Prodigal genes on the same contig
-        prodigal_genes_on_contig = prodigal_df[prodigal_df['contigID'] == glimmer_contig]
-        prodigal_genes_on_contig = prodigal_genes_on_contig.reset_index(drop=True)
-
-        # Swap values for negative strand
-        for i, row in prodigal_genes_on_contig.iterrows():
-            if row['strand'] == '-':
-                start_value = row['start']
-                end_value = row['stop']
-                prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('start')] = end_value
-                prodigal_genes_on_contig.iloc[i, prodigal_genes_on_contig.columns.get_loc('stop')] = start_value
-
-        # Check overlap with each Prodigal gene
-        overlaps = [
-            calculate_overlap(glimmer_interval, (row['start'], row['stop']))
-            for _, row in prodigal_genes_on_contig.iterrows()
-        ]
-
-        # Keep Glimmer gene if all overlaps are less than 5% of glimmer gene length
-        if all(overlap < 5 for overlap in overlaps):
-            filtered_glimmer.append(glimmer_gene)
-
+            # Calculate overlaps
+            overlaps = [
+                calculate_overlap(glimmer_interval, (start, stop))
+                for start, stop in prodigal_intervals
+            ]
+            if all(overlap < 5 for overlap in overlaps):
+                filtered_glimmer.append(glimmer_gene)
     return pd.DataFrame(filtered_glimmer)
 
 # Filter Glimmer genes
