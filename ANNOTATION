@@ -152,7 +152,7 @@ rule prodigal:
     output: Path(PRODIGAL_DIR, 'phages.prod')
     conda: 'dependencies/envs/orf-prediction.yml'
     threads: workflow.cores * 1.0
-    shell: 'prodigal-gv -i {input} -o {output} -f sco -p meta'
+    shell: 'prodigal-gv -i {input} -o {output} -f sco -p meta -c'
 
 # run glimmer (runs all cores)
 rule glimmer3:
