@@ -7,7 +7,7 @@ PCs2proteins = snakemake.output[0]
 
 
 # load
-clusters_df = pd.read_csv(clusters_raw, sep='\t')
+clusters_df = pd.read_csv(clusters_raw, sep='\t', header=None)
 clusters_df.columns = ['repr', 'proteinID']
 
 # sort & rename
